@@ -341,22 +341,21 @@ export async function GET(request: NextRequest) {
     let watchListRecords;
     let totalCount: number;
 
-    // Always use memory pagination with buffer for reliable pagination.
-    // The buffer approach (fetch from start, then slice in memory) 
-    // is the proven solution from 2026-02-19 that handles both 
-    // filtering and pagination correctly.
-    const recordsNeeded = hasTMDBFilters 
-      ? 1000  // Max for filtered queries
-      : Math.ceil(page * limit * 1.5);  // 1.5x buffer for unfiltered
+    // Use FIXED buffer based on whether filters are active, NOT page number.
+    // Each page request is independent, so we need consistent data.
+    // This is the proven approach from 2026-02-19 fix.
+    const hasFilters = hasTMDBFilters || minRating > 0 || maxRating < 10 || yearFrom || yearTo;
+    const BUFFER_SIZE = hasFilters ? 1000 : 100; // Fixed buffer, not page-dependent
 
-    logger.debug('Using memory pagination strategy', {
+    logger.debug('Using fixed buffer pagination', {
       context: 'my-movies',
-      hasTMDBFilters,
+      hasFilters,
       page,
       limit,
-      recordsNeeded
+      bufferSize: BUFFER_SIZE
     });
 
+    // Always fetch from start with fixed buffer
     watchListRecords = await prisma.watchList.findMany({
       where: whereClauseWithRating,
       select: {
@@ -372,15 +371,10 @@ export async function GET(request: NextRequest) {
         tags: { select: { id: true, name: true } },
       },
       orderBy: [{ addedAt: 'desc' }, { id: 'desc' }],
-      take: recordsNeeded,
+      take: BUFFER_SIZE,
     });
 
     totalCount = await prisma.watchList.count({ where: whereClauseWithRating });
-    logger.debug('Fetched records for memory pagination', {
-      context: 'my-movies',
-      fetchedCount: watchListRecords.length,
-      totalCount
-    });
 
     // Early exit if no records
     if (watchListRecords.length === 0) {

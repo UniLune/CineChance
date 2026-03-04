@@ -146,11 +146,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (includeHidden) {
-      // For hidden tab, we use blacklist
+    // For hidden tab, we use blacklist
       // Load enough to fill current page with buffer
-      const recordsNeeded = Math.ceil(page * limit * 1.5) + 1; // 50% buffer + 1
-      const skip = 0;
-      const take = Math.min(recordsNeeded, 500);
+      // FIX: Use proper pagination with skip and fixed take
+      const pageSkip = (page - 1) * limit;
+      const pageTake = limit + 1; // +1 to detect hasMore
 
       // Count total (for hidden tab - we don't use this but Prisma requires the query)
       const _totalCount = await prisma.blacklist.count({ where: { userId } });
@@ -160,8 +160,8 @@ export async function GET(request: NextRequest) {
         where: { userId },
         select: { tmdbId: true, mediaType: true, createdAt: true },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-        skip,
-        take,
+        skip: pageSkip,
+        take: pageTake,
       });
 
       // Early exit if no records
@@ -272,8 +272,8 @@ export async function GET(request: NextRequest) {
       const pageEndIndex = pageStartIndex + limit;
       const paginatedMovies = sortedMovies.slice(pageStartIndex, pageEndIndex);
       
-      // hasMore: true if more movies in sorted list OR if we loaded full batch (might be more in DB)
-      const hasMore = sortedMovies.length > pageEndIndex || blacklistRecords.length === take;
+      // hasMore: true if we got more records than limit (pageTake = limit + 1)
+      const hasMore = blacklistRecords.length > limit;
 
       return NextResponse.json({
         movies: paginatedMovies,
@@ -283,23 +283,11 @@ export async function GET(request: NextRequest) {
     }
 
     // For regular tabs (watched, wantToWatch, dropped)
-    // Load enough records to fill current page with buffer for filtering
-    // We need to fetch from start because filtering happens after getting TMDB data
-    const hasFilters = (
-      (typesParam && typesParam !== 'all' && typesParam.trim() !== '') ||
-      (yearFrom || yearTo) ||
-      (minRating > 0 || maxRating < 10) ||
-      (genresParam)
-    );
-    
-    // For filtered queries, fetch ALL records up to a reasonable limit
-    // This ensures pagination works correctly after client-side filtering
-    // When filters are applied, we need to fetch more because filtering happens client-side
-    const recordsNeeded = hasFilters ? 1000 : Math.min(Math.ceil(page * limit * 1.5) + 1, 500);
-    const skip = 0;
-    const take = recordsNeeded;
+    // FIX: Use proper pagination with skip and fixed take
+    const pageSkip = (page - 1) * limit;
+    const pageTake = limit + 1; // +1 to detect hasMore
 
-    logger.debug('Pagination strategy', { context: 'my-movies', page, limit, hasFilters, recordsNeeded, skip, take });
+    logger.debug('Pagination strategy', { context: 'my-movies', page, limit, pageSkip, pageTake });
 
     const watchListRecords = await prisma.watchList.findMany({
       where: whereClause,
@@ -316,8 +304,8 @@ export async function GET(request: NextRequest) {
         tags: { select: { id: true, name: true } },
       },
       orderBy: [{ addedAt: 'desc' }, { id: 'desc' }],
-      skip,
-      take,
+      skip: pageSkip,
+      take: pageTake,
     });
 
     // Early exit if no records
@@ -448,14 +436,15 @@ export async function GET(request: NextRequest) {
     const pageEndIndex = pageStartIndex + limit;
     const paginatedMovies = sortedMovies.slice(pageStartIndex, pageEndIndex);
     
-    // hasMore: Check if more movies exist in filtered result OR if we loaded full batch from DB
-    const hasMore = sortedMovies.length > pageEndIndex || watchListRecords.length === recordsNeeded;
+    // hasMore: Check if we got more records than limit (pageTake = limit + 1)
+    const hasMore = watchListRecords.length > limit;
 
     logger.debug('Pagination result', {
       context: 'my-movies',
       page,
       limit,
-      recordsNeeded,
+      pageSkip,
+      pageTake,
       watchListRecordsLength: watchListRecords.length,
       sortedMoviesLength: sortedMovies.length,
       paginatedMoviesLength: paginatedMovies.length,

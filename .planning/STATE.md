@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-02-17)
 
 **Core value:** Personal movie tracking with intelligent recommendations
-**Current focus:** Phase 16: ML Stats Security
+**Current focus:** Phase 19: Testing Foundation
 
 ## Current Status
 
-- **Phase:** 18 (Карта вкуса)
-- **Current Plan:** Not started
-- **Goal:** [To be planned]
+- **Phase:** 19 (Testing Foundation)
+- **Current Plan:** 02 (completed)
+- **Goal:** Increase test coverage to 80%+
 
 ## Progress
 
@@ -27,7 +27,8 @@ See: .planning/PROJECT.md (updated 2026-02-17)
 | 15 | ML Feedback Loop | ● Complete | 1 |
 | 16 | ML Stats Security | ● Complete | 0 |
 | 17 | Outcome Tracking | ● Complete | 0 |
-| 18 | Карта вкуса | ○ Not planned | 0 |
+| 18 | Карта вкуса | ● Complete | 0 |
+| 19 | Testing Foundation | ○ In Progress | 0 |
 
 ---
 
@@ -66,6 +67,8 @@ See: .planning/PROJECT.md (updated 2026-02-17)
 - **14-01:** Completed (5 min) - RecommendationsGrid component integrated into main page with horizontal scroll, cold start messaging, and confidence scoring
 - **18-01:** Completed (6 min) - Taste Map API endpoint with 24h Redis caching and profile page card linking to /profile/taste-map
 - **18-02:** Completed (~30 min) - Taste Map page with Recharts visualizations (genre bar chart, rating pie chart, actors/directors chips, computed metrics)
+- **19-01:** Completed (25 min) - Testing infrastructure with Vitest coverage thresholds
+- **19-02:** Completed (~10 min) - Added edge case tests for recommendation algorithms, achieved 85%+ coverage on all 4 algorithms
 
 ## Accumulated Context
 
@@ -74,6 +77,7 @@ See: .planning/PROJECT.md (updated 2026-02-17)
 - Phase 8 added: Admin panel UI improvements
 - Phase 15 added: ML outcome tracking and algorithm performance metrics
 - Phase 18 added: Карта вкуса (Taste Map)
+- Phase 19 added: Testing Foundation (increase test coverage to 80%+)
 
 ### Key Decisions (Phase 9)
 - ModelTraining is global (no userId) - tracks model versions, not per-user data

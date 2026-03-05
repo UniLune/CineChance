@@ -229,6 +229,32 @@ Plans:
 - [ ] 18-01-PLAN.md — API endpoint + Profile card
 - [ ] 18-02-PLAN.md — Taste Map page with visualizations
 
+### Phase 19: Testing Foundation: Increase test coverage to 80%+
+
+**Goal:** Increase test coverage from ~10% to 80%+ for critical modules
+**Depends on:** Phase 18
+**Status:** ✅ Planned
+**Plans:** 3/3 plans
+
+Plans:
+- [x] 19-01-PLAN.md — Configure testing infrastructure with coverage thresholds
+- [x] 19-02-PLAN.md — Test recommendation algorithms (85%+ coverage)
+- [x] 19-03-PLAN.md — Test taste-map compute and logger utilities
+
+---
+
+### Phase 20: Strict TypeScript Mode & Production Linting
+
+**Goal:** Enable strict TypeScript mode and production-grade ESLint/Next.js configuration to achieve zero type errors and successful production builds.
+**Depends on:** Phase 19
+**Status:** ⏳ Pending planning
+**Plans:** 0/3 plans
+
+Plans:
+- [ ] 20-01-PLAN.md — Configuration updates and quick fixes
+- [ ] 20-02-PLAN.md — Systematic any and unused variable elimination
+- [ ] 20-03-PLAN.md — Final verification and smoke testing
+
 ---
 
 _For current project status, see .planning/PROJECT.md_

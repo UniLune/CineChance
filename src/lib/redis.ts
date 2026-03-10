@@ -73,6 +73,11 @@ export async function withCache<T>(
   return fresh;
 }
 
+/**
+ * Invalidate cache keys matching a pattern.
+ * 
+ * @param pattern - Redis pattern to match (e.g., 'user:*')
+ */
 export async function invalidateCache(pattern: string): Promise<void> {
   const redis = getRedis();
   if (!redis) {
@@ -107,6 +112,11 @@ export async function invalidateCache(pattern: string): Promise<void> {
   }
 }
 
+/**
+ * Invalidate all cache for a specific user.
+ * 
+ * @param userId - User ID to invalidate cache for
+ */
 export async function invalidateUserCache(userId: string): Promise<void> {
   await invalidateCache(`user:${userId}:*`);
 }

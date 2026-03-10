@@ -1,18 +1,35 @@
 ---
-description: "Update docs after fix confirmed. Usage: /gsd-tdd-docs-update"
+description: "Update docs and knowledge base after bug fix confirmed. Usage: /gsd-tdd-docs-update"
 agent: gsd-tdd-docs
 ---
 
-Обнови документацию для последних изменений в коде.
+Пользователь подтвердил исправление бага. Обнови документацию и базу знаний.
 
+## Шаг 1 — Найди изменённые файлы
 ```bash
-# Найди файлы изменённые в последних коммитах
-git diff --name-only HEAD~3 HEAD | grep -E "\.(ts|tsx)$"
+git diff --name-only HEAD~5 HEAD | grep -E "\.(ts|tsx)$"
+cat .planning/debug/resolved/*.md 2>/dev/null | tail -100
 ```
+
+## Шаг 2 — Обнови JSDoc
 
 Для каждого изменённого файла:
 - Обнови JSDoc для изменённых функций и компонентов
 - Если есть README в папке — обнови
 - Объясняй ЗАЧЕМ, не КАК
+
+## Шаг 3 — Обнови knowledge.md
+
+Добавь в `knowledge.md` в раздел "Известные риски" или "Решения и почему":
+
+```markdown
+## Известные риски
+<!-- Добавь: -->
+- [Bug: <slug>] <компонент> — <краткое описание причины бага и как исправлено>
+
+## Решения и почему
+<!-- Добавь если найдено архитектурное решение: -->
+- [<дата>] <что решили> — <почему>
+```
 
 Не меняй логику кода.

@@ -2,14 +2,14 @@
 
 ## Executive Summary
 
-В течение февраля 2026 года проект CineChance столкнулся с **17 инцидентами**, которые можно сгруппировать в **5 системных паттернов**. Этот документ анализирует корневые причины на уровне архитектуры, процессов и культуры разработки.
+В течение февраля 2026 года проект CineChance столкнулся с **22 инцидентами**, которые можно сгруппировать в **6 системных паттернов**. Этот документ анализирует корневые причины на уровне архитектуры, процессов и культуры разработки.
 
 ### Ключевые Метрики
 
-- **Всего багов:** 17
-- **Уникальных паттернов:** 5
-- **Критических инцидентов:** 6
-- **Файлов изменено:** 50+
+- **Всего багов:** 22 (17 + 5 новых)
+- **Уникальных паттернов:** 6
+- **Критических инцидентов:** 7
+- **Файлов изменено:** 60+
 - **Дней на исправление:** 14 (период с 09.02 по 16.02)
 
 ### Группировка по Паттернам
@@ -21,6 +21,7 @@
 | Статусы | 3 | Средняя | Отображение данных |
 | Кеширование | 4 | Высокая | Производительность |
 | API Архитектура | 3 | Средняя | Клиент-сервер |
+| Race Conditions | 2 | Высокая | Client-side fetch |
 
 ---
 
@@ -269,6 +270,7 @@ metrics.gauge('cache.hit_rate', hitRate, { cache_name });
 - `limit * 1.5` - зачем 1.5?
 - `500` max records - откуда число?
 - `86400` cache TTL - почему 24 часа?
+- `0.5` threshold для similarity - почему именно 0.5?
 
 **Решение:**
 ```typescript
@@ -283,11 +285,15 @@ export const CONFIG = {
     imageTtl: 6 * 60 * 60, // 6 hours, documented
     statsTtl: 60 * 60,     // 1 hour
     errorTtl: 0,           // Never cache errors
+    tmdbTtl: 24 * 60 * 60, // 24 hours for TMDB
   },
   rateLimit: {
     imageProxy: 1000,
     search: 300,
     default: 100,
+  },
+  similarity: {
+    threshold: 0.5, // Minimum overall match for "similar users"
   },
 } as const;
 ```
@@ -301,12 +307,56 @@ export const CONFIG = {
 - Только один тип фильтра (anime без cartoon)
 - Rate limit при первой загрузке
 - Таймаут TMDB API
+- **Race conditions** при переходе между страницами (новое!)
 
 **Решение:** При разработке feature:
 1. Определить happy path
 2. Список edge cases (пустой, один элемент, максимум, ошибка)
 3. Тесты для каждого edge case
 4. Graceful degradation
+5. **Добавить AbortController для всех fetch запросов**
+
+### Паттерн #4: Race Conditions в Client-Side Fetch
+
+**Наблюдение:** При переходе между страницами старые fetch-запросы не отменялись, вызывая state update после unmount.
+
+**Примеры:**
+- Collection page crash при переходе с главной (AbortController отсутствовал)
+- Double-fetch в useEffect без очистки
+
+**Корневая Причина:**
+- Отсутствие AbortController в useEffect
+- Нет проверки isMounted перед setState
+- Suspense boundary transitions могут вызвать перерендер
+
+**Решение:**
+```typescript
+// Правильный паттерн для fetch в useEffect
+useEffect(() => {
+  const controller = new AbortController();
+  let isMounted = true;
+
+  const fetchData = async () => {
+    try {
+      const data = await fetch(url, { signal: controller.signal });
+      if (isMounted) {
+        setData(data);
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError' && isMounted) {
+        setError(error);
+      }
+    }
+  };
+
+  fetchData();
+
+  return () => {
+    controller.abort();
+    isMounted = false;
+  };
+}, [url]);
+```
 
 ---
 
@@ -315,23 +365,29 @@ export const CONFIG = {
 ### Немедленные Действия (1-2 недели)
 
 1. **Создать shared utilities:**
-   ```typescript
-   // src/lib/pagination.ts
-   // src/lib/cache.ts
-   // src/lib/api-response.ts
-   ```
+    ```typescript
+    // src/lib/pagination.ts
+    // src/lib/cache.ts
+    // src/lib/api-response.ts
+    ```
 
 2. **Внедрить runtime validation:**
-   ```bash
-   npm install zod
-   # Добавить валидацию во все API routes
-   ```
+    ```bash
+    npm install zod
+    # Добавить валидацию во все API routes
+    ```
 
 3. **Создать чеклисты:**
-   - Новый API endpoint
-   - Изменение статусов
-   - Добавление кеширования
-   - Изменение пагинации
+    - Новый API endpoint
+    - Изменение статусов
+    - Добавление кеширования
+    - Изменение пагинации
+    - **Добавление fetch в useEffect (обязательно AbortController!)**
+
+4. **Добавить AbortController во все fetch запросы:**
+    - Проверить все useEffect с fetch
+    - Добавить isMounted флаг
+    - Фильтровать AbortError в логах
 
 ### Краткосрочные (1-2 месяца)
 
@@ -417,6 +473,8 @@ export const CONFIG = {
 - [Status Display Consistency Failures](./status-display-consistency-failures.md)
 - [Caching Architecture Failures](./caching-architecture-failures.md)
 - [API Architecture Failures](./api-architecture-failures.md)
+- [Collection Page Crash (Race Condition)](./2026-02-25-collection-page-crash-after-load.md)
+- [Similar Users Not Found (Similarity Logic)](./2026-02-24-similar-users-not-found.md)
 
 ---
 

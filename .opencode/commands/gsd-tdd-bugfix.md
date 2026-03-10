@@ -8,12 +8,12 @@ agent: gsd-tdd-orchestrator
 Выполни все шаги автоматически без остановок. Переходи к следующему шагу сразу после завершения предыдущего.
 
 ## Шаг 1 — Анализ → вызови gsd-tdd-bugfixer
-Передай описание бага. Bugfixer создаёт `.planning/bugs/<slug>.md`.
+Передай описание бага. Bugfixer создаёт `.planning/debug/resolved/<slug>.md`.
 Единственная допустимая пауза — если bugfixer задаёт уточняющие вопросы пользователю.
 После получения ответов — продолжай автоматически.
 
 ## Шаг 2 — RED → вызови gsd-tdd-red
-Прочитай `.planning/bugs/<slug>.md` раздел "Spec для RED теста".
+Прочитай `.planning/debug/resolved/<slug>.md` раздел "Spec для RED теста".
 Напиши тест. Убедись что RED. Сразу переходи к Шагу 3.
 
 ## Шаг 3 — GREEN → вызови gsd-tdd-green
@@ -34,7 +34,7 @@ npx tsc --noEmit 2>&1 | head -20
 ✅ Bug Fixed — проверьте в браузере
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Bug: $ARGUMENTS
-Report: .planning/bugs/<slug>.md
+Report: .planning/debug/resolved/<slug>.md
 Тесты: N passed / 0 failed
 Регрессии: не обнаружены
 

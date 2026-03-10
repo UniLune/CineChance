@@ -155,6 +155,9 @@ export function hasTMDB(key: string): boolean {
 /**
  * Clear TMDB cache
  */
+/**
+ * Clear all TMDB cache entries.
+ */
 export function clearTMDBCache(): void {
   tmdbCache.clear();
   logger.info('TMDB cache cleared');
@@ -166,6 +169,14 @@ export default tmdbCache;
 /**
  * @deprecated Use getTMDB instead
  */
+/**
+ * Get cached media details (deprecated - use getTMDB instead).
+ * 
+ * @param tmdbId - TMDB ID of the media
+ * @param mediaType - Type of media ('movie' or 'tv')
+ * @returns Cached MovieDetails or null
+ * @deprecated Use getTMDB instead
+ */
 export function getCachedMediaDetails(tmdbId: number, mediaType: string): MovieDetails | null {
   if (!mediaType) return null;
   const key = `${mediaType}:${tmdbId}`;
@@ -173,6 +184,14 @@ export function getCachedMediaDetails(tmdbId: number, mediaType: string): MovieD
 }
 
 /**
+ * @deprecated Use setTMDB instead
+ */
+/**
+ * Set cached media details (deprecated - use setTMDB instead).
+ * 
+ * @param tmdbId - TMDB ID of the media
+ * @param mediaType - Type of media ('movie' or 'tv')
+ * @param data - MovieDetails to cache
  * @deprecated Use setTMDB instead
  */
 export function setCachedMediaDetails(tmdbId: number, mediaType: string, data: MovieDetails): void {

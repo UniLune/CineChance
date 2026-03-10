@@ -257,9 +257,9 @@ Plans:
 
 ---
 
-### Phase 21: Serial Numbers on Movie Cards
+### Phase 21: Order Numbers for Count Verification
 
-**Goal:** Add small serial numbers (1, 2, 3...) to each movie card in "Мои фильмы" (My Movies) page, visible in all tabs.
+**Goal:** Add order numbers (1, 2, 3...) to each movie card in "Мои фильмы" (My Movies) page, visible in all tabs. Purpose: Allow users to verify total count of loaded results.
 
 **Requirements:** [SERIAL-01]
 

@@ -14,6 +14,81 @@ import StatusOverlay from './StatusOverlay';
 import { logger } from '@/lib/logger';
 import { useBlacklist } from './BlacklistContext';
 
+const getRecommendationLogId = (movieId: number): string | undefined => {
+  if (typeof window === 'undefined') return undefined;
+  
+  try {
+    const logIdMap = JSON.parse(localStorage.getItem('rec_logid_map') || '{}');
+    return logIdMap[String(movieId)];
+  } catch {
+    return undefined;
+  }
+};
+
+const fetchCineChanceRating = async (
+  movieId: number,
+  mediaType: string,
+  onSuccess: (rating: number, count: number) => void
+): Promise<void> => {
+  try {
+    const res = await fetch(`${API_ENDPOINTS.CINE_CHANCE_RATING}?tmdbId=${movieId}&mediaType=${mediaType}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.averageRating !== undefined && data.count !== undefined) {
+        onSuccess(data.averageRating, data.count);
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Failed to fetch CineChance rating', {
+      tmdbId: movieId,
+      mediaType,
+      error: errorMessage,
+    });
+  }
+};
+
+const API_ENDPOINTS = {
+  CINE_CHANCE_RATING: '/api/cine-chance-rating',
+  WATCHLIST: '/api/watchlist',
+  BLACKLIST: '/api/blacklist',
+  MOVIE_DETAILS: '/api/movie-details',
+} as const;
+
+const STATUS_Z_INDEX = {
+  STATUS: 10,
+  BLACKLIST: 20,
+} as const;
+
+const STATUS_ICON_CONFIG = {
+  want: {
+    color: 'bg-white',
+    icon: '+',
+    textColor: 'text-blue-500',
+  },
+  watched: {
+    color: 'bg-green-500',
+    icon: '✓',
+    textColor: 'text-white',
+  },
+  dropped: {
+    color: 'bg-red-500',
+    icon: '×',
+    textColor: 'text-white',
+  },
+  rewatched: {
+    color: 'bg-purple-500',
+    icon: '↻',
+    textColor: 'text-white',
+  },
+} as const;
+
+const RESTORE_VIEW_ICON = {
+  color: 'bg-gray-800',
+  icon: '🚫',
+  textColor: 'text-gray-300',
+} as const;
+
 const RATING_TEXTS: Record<number, string> = {
   1: 'Хуже некуда',
   2: 'Ужасно',
@@ -40,6 +115,13 @@ interface MovieCardProps {
   initialWatchCount?: number;
   initialAverageRating?: number | null;
   initialRatingCount?: number;
+  /**
+   * 0-based index of the movie in the list. Displayed as order number +1 for verification.
+   * @since 21-serial-numbers
+   * @example 0 // displays as "1" in top-left corner
+   * @example 9 // displays as "10" in top-left corner
+   */
+  index?: number;
 }
 
 export default function MovieCard({ 
@@ -52,7 +134,8 @@ export default function MovieCard({
   initialUserRating, 
   initialWatchCount, 
   initialAverageRating, 
-  initialRatingCount 
+  initialRatingCount,
+  index
 }: MovieCardProps) {
   const [showOverlay, setShowOverlay] = useState(false);
   const [status, setStatus] = useState<MediaStatus>(initialStatus ?? null);
@@ -621,7 +704,12 @@ export default function MovieCard({
             onMouseEnter={handlePosterMouseEnter}
             onMouseLeave={handlePosterMouseLeave}
           >
-            
+            {index !== undefined && (
+              <div className="absolute top-0 left-0 z-10 bg-amber-900/40 text-amber-100/90 text-xs px-1.5 py-0.5 rounded shadow-sm">
+                <span>{Math.floor(index) + 1}</span>
+              </div>
+            )}
+
             {getStatusIcon()}
 
             <MoviePosterProxy

@@ -6,11 +6,21 @@ import { Media } from '@/lib/tmdb';
 
 // Mock IntersectionObserver for infinite scroll
 beforeAll(() => {
-  global.IntersectionObserver = class IntersectionObserver {
+  class MockIntersectionObserver implements IntersectionObserver {
+    readonly root: Element | null = null;
+    readonly rootMargin: string = '';
+    readonly thresholds: ReadonlyArray<number> = [];
+    constructor(
+      callback: IntersectionObserverCallback,
+      options?: IntersectionObserverInit
+    ) {}
     observe = vi.fn();
     unobserve = vi.fn();
     disconnect = vi.fn();
-  };
+    takeRecords(): IntersectionObserverEntry[] { return []; }
+  }
+
+  global.IntersectionObserver = MockIntersectionObserver as unknown as typeof IntersectionObserver;
 });
 
 // For integration tests, we'll use the real MovieCard but mock its child components
@@ -142,9 +152,8 @@ describe('FilmGridWithFilters - Order Numbers Integration', () => {
     expect(screen.getByText('1')).toBeInTheDocument();
   });
 
-  it('renders movies without index prop (currently fails - RED phase)', async () => {
-    // This test will initially FAIL because FilmGridWithFilters does not pass `index` prop to MovieCard
-    // In RED phase, we expect it to NOT render order numbers
+  it('renders movies with index prop and displays order numbers', async () => {
+    // After GREEN phase, FilmGridWithFilters passes index prop to MovieCard and order numbers appear
     render(
       <FilmGridWithFilters
         fetchMovies={mockFetchMovies}
@@ -152,21 +161,21 @@ describe('FilmGridWithFilters - Order Numbers Integration', () => {
       />
     );
 
-    // Wait for movies to render
     await waitFor(() => {
       expect(screen.getAllByText(/Movie [1-3]/).length).toBeGreaterThan(0);
     });
 
-    // Currently, there should be NO order numbers visible because index prop is not passed
-    const orderNumbers = screen.queryAllByText(/^(?:[1-9]|[1-9][0-9]+)$/);
-    expect(orderNumbers.length).toBe(0);
-    
-    // No elements should have the golden styling for order numbers
+    // All 3 movies should have order numbers 1, 2, 3
+    const orderNumbers = screen.getAllByText(/^[1-3]$/);
+    expect(orderNumbers.length).toBe(3);
+
+    // Additionally, golden styling should be present
     const goldenElements = document.querySelectorAll('.bg-amber-900\\/40, .text-amber-100\\/90');
-    expect(goldenElements.length).toBe(0);
+    expect(goldenElements.length).toBeGreaterThanOrEqual(3);
   });
 
-  it('MovieCards are rendered but without order number badge (RED phase)', async () => {
+  it('MovieCards receive index prop and display order numbers', async () => {
+    // After implementation, MovieCards should have index prop and show order numbers
     render(
       <FilmGridWithFilters
         fetchMovies={mockFetchMovies}
@@ -182,9 +191,9 @@ describe('FilmGridWithFilters - Order Numbers Integration', () => {
     const movieCards = document.querySelectorAll('[data-testid="movie-poster-proxy"]');
     expect(movieCards.length).toBe(3);
 
-    // But order numbers are NOT present yet
-    const orderNumbers = screen.queryAllByText(/^(?:[1-9]|[1-9][0-9]+)$/);
-    expect(orderNumbers.length).toBe(0);
+    // Order numbers should be present (1, 2, 3)
+    const orderNumbers = screen.getAllByText(/^[1-3]$/);
+    expect(orderNumbers.length).toBe(3);
   });
 
   it('empty state works correctly', async () => {
@@ -210,7 +219,7 @@ describe('FilmGridWithFilters - Order Numbers Integration', () => {
     expect(movieCards.length).toBe(0);
   });
 
-  it('single movie renders without order number', async () => {
+  it('single movie displays order number 1', async () => {
     const singleMovieFetch = vi.fn().mockResolvedValue({
       movies: [mockMovies[0]],
       hasMore: false,
@@ -227,8 +236,7 @@ describe('FilmGridWithFilters - Order Numbers Integration', () => {
       expect(screen.getAllByText(/Movie 1/).length).toBeGreaterThan(0);
     });
 
-    // No order number should appear
-    const orderNumbers = screen.queryAllByText(/^(?:[1-9]|[1-9][0-9]+)$/);
-    expect(orderNumbers.length).toBe(0);
+    // Single movie should show order number 1
+    expect(screen.getByText('1')).toBeInTheDocument();
   });
 });

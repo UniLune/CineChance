@@ -19,35 +19,6 @@ export interface PersonData {
   name: string;
   count: number; // How many movies they appear in
   avgWeightedRating: number; // Weighted by watchCount
-  profile_path: string | null;
-  watched_movies: number;
-  rewatched_movies: number;
-  dropped_movies: number;
-  total_movies: number;
-  progress_percent: number;
-  actor_score: number;
-}
-
-/**
- * Calculate actor score based on multiple factors
- * Combines quality, progress, volume, and watched count bonuses
- */
-export function calculateActorScore(actor: PersonData): number {
-  const baseRating = actor.avgWeightedRating || 0;
-  const qualityBonus = Math.max(0, Math.min(10,
-    baseRating + (actor.rewatched_movies * 0.2) - (actor.dropped_movies * 0.3)
-  ));
-  const progressBonus = actor.total_movies > 0
-    ? Math.log(actor.total_movies + 1) * (actor.progress_percent / 100)
-    : 0;
-  const volumeBonus = actor.total_movies > 0
-    ? Math.log(actor.total_movies + 1) / Math.log(200)
-    : 0;
-  const watchedCountBonus = actor.watched_movies > 0
-    ? Math.log(actor.watched_movies + 1) / Math.log(50)
-    : 0;
-
-  return (qualityBonus * 0.35) + (progressBonus * 0.25) + (volumeBonus * 0.15) + (watchedCountBonus * 0.15);
 }
 
 /**
@@ -112,46 +83,6 @@ export async function ensureMoviePersonCacheExists(
   }
 }
 
-// In-memory cache for person credits from TMDB
-const personCreditsCache = new Map<number, { data: unknown; timestamp: number }>();
-const CACHE_DURATION = 86400000; // 24 hours
-const TMDB_API_KEY = process.env.TMDB_API_KEY;
-
-/**
- * Fetch person credits from TMDB with caching
- */
-async function fetchPersonCredits(actorId: number): Promise<unknown | null> {
-  const cached = personCreditsCache.get(actorId);
-  const now = Date.now();
-
-  if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-    return cached.data;
-  }
-
-  if (!TMDB_API_KEY) return null;
-
-  try {
-    const url = new URL(`https://api.themoviedb.org/3/person/${actorId}/combined_credits`);
-    url.searchParams.append('api_key', TMDB_API_KEY);
-    url.searchParams.append('language', 'ru-RU');
-
-    const response = await fetch(url.toString(), {
-      headers: { 'accept': 'application/json' },
-      next: { revalidate: 86400 },
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-    personCreditsCache.set(actorId, { data, timestamp: now });
-    return data;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Full computation: recalculate top-50 persons for a user
  * Based on all their watched/rewatched movies and associated cast/crew
@@ -193,150 +124,13 @@ export async function computeUserPersonProfile(
       TOP_PERSONS_LIMIT
     );
 
-    if (topPersons.length === 0) {
-      // Save empty profile to database
-      await prisma.personProfile.upsert({
-        where: {
-          userId_personType: { userId, personType },
-        },
-        update: {
-          topPersons: [],
-          totalMoviesAnalyzed: 0,
-          computedAt: new Date(),
-          computationMethod: 'full',
-        },
-        create: {
-          userId,
-          personType,
-          topPersons: [],
-          totalMoviesAnalyzed: 0,
-          computationMethod: 'full',
-        },
-      });
-      return [];
-    }
-
-    // Get actor IDs for querying watchlist counts
-    const actorIds = topPersons.map(p => p.tmdbId);
-
-    // Query watchlist counts by status for these actors using raw SQL
-    // We'll use a simpler approach without the IN clause - filter in JS
-    const watchedCounts = await prisma.$queryRaw<Array<{ person_id: number; count: bigint }>>`
-      SELECT 
-        (person->>'id')::INT as person_id,
-        COUNT(*)::BIGINT as count
-      FROM "MoviePersonCache" mpc,
-        jsonb_array_elements(mpc."topActors") as person
-      WHERE EXISTS (
-        SELECT 1 FROM "WatchList" wl
-        WHERE wl."userId" = ${userId}
-          AND wl."statusId" = ${MOVIE_STATUS_IDS.WATCHED}
-          AND wl."tmdbId" = mpc."tmdbId"
-          AND wl."mediaType" = mpc."mediaType"
-      )
-      GROUP BY person_id
-    `;
-
-    const rewatchedCounts = await prisma.$queryRaw<Array<{ person_id: number; count: bigint }>>`
-      SELECT 
-        (person->>'id')::INT as person_id,
-        COUNT(*)::BIGINT as count
-      FROM "MoviePersonCache" mpc,
-        jsonb_array_elements(mpc."topActors") as person
-      WHERE EXISTS (
-        SELECT 1 FROM "WatchList" wl
-        WHERE wl."userId" = ${userId}
-          AND wl."statusId" = ${MOVIE_STATUS_IDS.REWATCHED}
-          AND wl."tmdbId" = mpc."tmdbId"
-          AND wl."mediaType" = mpc."mediaType"
-      )
-      GROUP BY person_id
-    `;
-
-    const droppedCounts = await prisma.$queryRaw<Array<{ person_id: number; count: bigint }>>`
-      SELECT 
-        (person->>'id')::INT as person_id,
-        COUNT(*)::BIGINT as count
-      FROM "MoviePersonCache" mpc,
-        jsonb_array_elements(mpc."topActors") as person
-      WHERE EXISTS (
-        SELECT 1 FROM "WatchList" wl
-        WHERE wl."userId" = ${userId}
-          AND wl."statusId" = ${MOVIE_STATUS_IDS.DROPPED}
-          AND wl."tmdbId" = mpc."tmdbId"
-          AND wl."mediaType" = mpc."mediaType"
-      )
-      GROUP BY person_id
-    `;
-
-    // Filter counts to only include actors we're interested in
-    const watchedMap = new Map(
-      watchedCounts
-        .filter(r => actorIds.includes(r.person_id))
-        .map(r => [r.person_id, Number(r.count)])
-    );
-    const rewatchedMap = new Map(
-      rewatchedCounts
-        .filter(r => actorIds.includes(r.person_id))
-        .map(r => [r.person_id, Number(r.count)])
-    );
-    const droppedMap = new Map(
-      droppedCounts
-        .filter(r => actorIds.includes(r.person_id))
-        .map(r => [r.person_id, Number(r.count)])
-    );
-
-    // Transform to enriched PersonData format
-    const personDataPromises = topPersons.map(async (p) => {
-      const watchedMovies = watchedMap.get(p.tmdbId) || 0;
-      const rewatchedMovies = rewatchedMap.get(p.tmdbId) || 0;
-      const droppedMovies = droppedMap.get(p.tmdbId) || 0;
-
-      // Fetch person credits from TMDB to get total movies and profile
-      let profilePath: string | null = null;
-      let totalMovies = 0;
-
-      try {
-        const credits = await fetchPersonCredits(p.tmdbId) as { cast?: Array<{ id: number; name: string; profile_path: string | null }> } | null;
-        if (credits?.cast) {
-          // Get profile path from first cast entry (most prominent role)
-          const firstCast = credits.cast[0];
-          profilePath = firstCast?.profile_path || null;
-          totalMovies = credits.cast.length;
-        }
-      } catch {
-        // Use defaults if TMDB call fails
-        totalMovies = p.count;
-      }
-
-      const progressPercent = totalMovies > 0
-        ? Math.round((watchedMovies / totalMovies) * 100)
-        : 0;
-
-      const personData: PersonData = {
-        tmdbPersonId: p.tmdbId,
-        name: p.name,
-        count: p.count,
-        avgWeightedRating: p.avgRating,
-        profile_path: profilePath,
-        watched_movies: watchedMovies,
-        rewatched_movies: rewatchedMovies,
-        dropped_movies: droppedMovies,
-        total_movies: totalMovies,
-        progress_percent: progressPercent,
-        actor_score: 0, // Will be calculated below
-      };
-
-      // Calculate actor score
-      personData.actor_score = calculateActorScore(personData);
-
-      return personData;
-    });
-
-    let personData: PersonData[] = await Promise.all(personDataPromises);
-
-    // Sort by actor_score descending
-    personData.sort((a, b) => b.actor_score - a.actor_score);
+    // Transform to PersonData format
+    const personData: PersonData[] = topPersons.map((p) => ({
+      tmdbPersonId: p.tmdbId,
+      name: p.name,
+      count: p.count,
+      avgWeightedRating: p.avgRating,
+    }));
 
     // Count analyzed movies
     const analyzedCount = await prisma.watchList.count({
@@ -346,27 +140,27 @@ export async function computeUserPersonProfile(
       },
     });
 
-    // Save to database
-    await prisma.personProfile.upsert({
-      where: {
-        userId_personType: { userId, personType },
-      },
-      update: {
-        // @ts-expect-error: PersonData[] is JSON-serializable and acceptable for Json field
-        topPersons: personData,
-        totalMoviesAnalyzed: analyzedCount,
-        computedAt: new Date(),
-        computationMethod: 'full',
-      },
-      create: {
-        userId,
-        personType,
-        // @ts-expect-error: PersonData[] is JSON-serializable and acceptable for Json field
-        topPersons: personData,
-        totalMoviesAnalyzed: analyzedCount,
-        computationMethod: 'full',
-      },
-    });
+     // Save to database
+     const profile = await prisma.personProfile.upsert({
+       where: {
+         userId_personType: { userId, personType },
+       },
+        update: {
+          // @ts-expect-error: PersonData[] is JSON-serializable and acceptable for Json field
+          topPersons: personData,
+          totalMoviesAnalyzed: analyzedCount,
+          computedAt: new Date(),
+          computationMethod: 'full',
+        },
+        create: {
+          userId,
+          personType,
+          // @ts-expect-error: PersonData[] is JSON-serializable and acceptable for Json field
+          topPersons: personData,
+          totalMoviesAnalyzed: analyzedCount,
+          computationMethod: 'full',
+        },
+     });
 
     logger.info('Completed person profile computation', {
       userId,
@@ -374,8 +168,6 @@ export async function computeUserPersonProfile(
       personsCount: personData.length,
       moviesAnalyzed: analyzedCount,
     });
-
-    return personData;
 
     return personData;
   } catch (error) {

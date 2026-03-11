@@ -93,25 +93,10 @@ export default function ActorsClient({ userId }: ActorsClientProps) {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-          let errorDetail = '';
-          try {
-            const errorData = await response.json();
-            errorDetail = errorData.error || JSON.stringify(errorData);
-          } catch {
-            errorDetail = await response.text();
-          }
-          logger.error('API error response', { status: response.status, detail: errorDetail });
-          throw new Error(`API Error: ${response.status} - ${errorDetail}`);
+          throw new Error(`API Error: ${response.status}`);
         }
 
-        let data;
-        try {
-          data = await response.json() as { actors: ActorAchievement[] };
-        } catch (parseErr) {
-          const text = await response.text();
-          logger.error('Failed to parse API response', { status: response.status, text: text.substring(0, 500) });
-          throw new Error(`Failed to parse response: ${text.substring(0, 100)}`);
-        }
+        const data = await response.json() as { actors: ActorAchievement[] };
         
         logger.debug('Actors API response', { data });
         
@@ -141,20 +126,13 @@ export default function ActorsClient({ userId }: ActorsClientProps) {
         
         // Детальная обработка ошибок
         let errorMessage = 'Не удалось загрузить актеров. Попробуйте позже.';
-        const errorStr = err instanceof Error ? err.message : String(err);
-        
-        logger.error('Actors loading error', { 
-          error: errorStr,
-          name: err instanceof Error ? err.name : 'Unknown',
-          hasResponse: err instanceof Error && 'response' in err
-        });
-        
         if (err instanceof Error) {
+          logger.error('Actors loading error', { error: err instanceof Error ? err.message : String(err) });
           if (err.name === 'AbortError') {
             errorMessage = 'Загрузка занимает слишком много времени. У вас много просмотренных фильмов, поэтому требуется больше времени. Попробуйте обновить страницу.';
-          } else if (errorStr.includes('API Error')) {
+          } else if (err.message.includes('API Error')) {
             errorMessage = 'Ошибка сервера при загрузке актеров. Попробуйте позже.';
-          } else if (errorStr.includes('Failed to fetch')) {
+          } else if (err.message.includes('Failed to fetch')) {
             errorMessage = 'Проблемы с соединением. Проверьте интернет-соединение.';
           }
         }

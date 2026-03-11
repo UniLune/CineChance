@@ -106,7 +106,10 @@ export interface FilmGridWithFiltersProps {
   /** Скрывать ли блок фильтрации по жанрам */
   hideGenresFilter?: boolean;
   
-  /** Показывать ли порядковый номер (индекс) */
+  /** Показывать ли порядковый номер (индекс).
+   * @default true - по умолчанию индекс показывается в сетке.
+   * @example showIndex={false} - скрыть индекс в "Моих фильмах", где нумерация не нужна.
+   */
   showIndex?: boolean;
 }
 
@@ -358,7 +361,7 @@ export default function FilmGridWithFilters({
                     initialAverageRating={movie.vote_average}
                     initialRatingCount={movie.vote_count}
                     initialUserRating={getInitialRating ? getInitialRating(movie) : undefined}
-                    index={showIndex ? index : undefined}
+                    index={showIndex ? index : undefined} // Передаем undefined вместо -1, чтобы MovieCard скрыл индекс полностью
                   />
                 </MovieCardErrorBoundary>
               </div>

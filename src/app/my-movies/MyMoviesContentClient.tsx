@@ -62,6 +62,7 @@ export default function EnhancedMoviesContentClient({
   const [showWatchedPopup, setShowWatchedPopup] = useState(false);
   const [acceptedRecommendation, setAcceptedRecommendation] = useState<AcceptedRecommendation | null>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  /** Состояние видимости кнопки "Наверх" - показывается при прокрутке более 300px */
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   // Загружаем доступные жанры и теги пользователя
@@ -95,7 +96,8 @@ export default function EnhancedMoviesContentClient({
     fetchData();
   }, [userId]);
 
-  // Scroll to top button
+  // Scroll to top button - отслеживаем позицию скролла
+  // Паттерн скопирован из SearchClient - показываем кнопку когда пользователь прокрутил страницу вниз
   useEffect(() => {
     const handleScroll = () => {
       setShowScrollTop(window.scrollY > 300);
@@ -392,7 +394,7 @@ export default function EnhancedMoviesContentClient({
           />
         </BlacklistProvider>
 
-        {/* Кнопка "Наверх" */}
+        {/* Кнопка "Наверх" - появляется при прокрутке страницы вниз */}
         {showScrollTop && (
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}

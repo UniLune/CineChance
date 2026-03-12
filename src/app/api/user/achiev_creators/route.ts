@@ -813,29 +813,31 @@ export async function GET(request: Request) {
            creator_score: _calculateCreatorScore(creator),
          }));
 
-         // Sort by creator_score with tie-breakers (matching actors pattern)
-         creatorsWithScores.sort((a, b) => {
-           // Primary: creator_score descending
-           if (b.creator_score !== a.creator_score) {
-             return b.creator_score - a.creator_score;
-           }
-           // Tie-breaker 1: average_rating (nulls last)
-           if (a.average_rating !== null && b.average_rating !== null) {
-             if (b.average_rating !== a.average_rating) {
-               return b.average_rating - a.average_rating;
-             }
-           } else if (a.average_rating === null && b.average_rating !== null) {
-             return 1;
-           } else if (a.average_rating !== null && b.average_rating === null) {
-             return -1;
-           }
-           // Tie-breaker 2: progress_percent descending
-           if (b.progress_percent !== a.progress_percent) {
-             return b.progress_percent - a.progress_percent;
-           }
-           // Tie-breaker 3: name alphabetical (Russian locale)
-           return a.name.localeCompare(b.name, 'ru');
-         });
+          // Sort by average_rating first, then by progress_percent (matching user requirement)
+          // Creators with higher average rating appear first
+          // When ratings are equal, sort by progress_percent descending
+          creatorsWithScores.sort((a, b) => {
+            // Primary: average_rating descending (nulls last - creators with ratings first)
+            if (a.average_rating !== null && b.average_rating !== null) {
+              if (b.average_rating !== a.average_rating) {
+                return b.average_rating - a.average_rating;
+              }
+            } else if (a.average_rating === null && b.average_rating !== null) {
+              return 1; // nulls last
+            } else if (a.average_rating !== null && b.average_rating === null) {
+              return -1;
+            }
+            // Tie-breaker 1: progress_percent descending
+            if (b.progress_percent !== a.progress_percent) {
+              return b.progress_percent - a.progress_percent;
+            }
+            // Tie-breaker 2: creator_score descending
+            if (b.creator_score !== a.creator_score) {
+              return b.creator_score - a.creator_score;
+            }
+            // Tie-breaker 3: name alphabetical (Russian locale)
+            return a.name.localeCompare(b.name, 'ru');
+          });
 
          const result = creatorsWithScores.slice(0, limit);
 
@@ -876,25 +878,29 @@ export async function GET(request: Request) {
          creator_score: _calculateCreatorScore(creator),
        }));
 
-       // Sort by creator_score with tie-breakers
-       creatorsWithScores.sort((a, b) => {
-         if (b.creator_score !== a.creator_score) {
-           return b.creator_score - a.creator_score;
-         }
-         if (a.average_rating !== null && b.average_rating !== null) {
-           if (b.average_rating !== a.average_rating) {
-             return b.average_rating - a.average_rating;
-           }
-         } else if (a.average_rating === null && b.average_rating !== null) {
-           return 1;
-         } else if (a.average_rating !== null && b.average_rating === null) {
-           return -1;
-         }
-         if (b.progress_percent !== a.progress_percent) {
-           return b.progress_percent - a.progress_percent;
-         }
-         return a.name.localeCompare(b.name, 'ru');
-       });
+        // Sort by average_rating first, then by progress_percent
+        creatorsWithScores.sort((a, b) => {
+          // Primary: average_rating descending (nulls last)
+          if (a.average_rating !== null && b.average_rating !== null) {
+            if (b.average_rating !== a.average_rating) {
+              return b.average_rating - a.average_rating;
+            }
+          } else if (a.average_rating === null && b.average_rating !== null) {
+            return 1;
+          } else if (a.average_rating !== null && b.average_rating === null) {
+            return -1;
+          }
+          // Tie-breaker 1: progress_percent descending
+          if (b.progress_percent !== a.progress_percent) {
+            return b.progress_percent - a.progress_percent;
+          }
+          // Tie-breaker 2: creator_score descending
+          if (b.creator_score !== a.creator_score) {
+            return b.creator_score - a.creator_score;
+          }
+          // Tie-breaker 3: name alphabetical (Russian locale)
+          return a.name.localeCompare(b.name, 'ru');
+        });
 
        const result = creatorsWithScores.slice(offset, Math.min(offset + limit, creatorsWithScores.length));
 

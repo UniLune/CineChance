@@ -288,4 +288,18 @@ Plans:
 
 ---
 
+### Phase 23: Profile Creators Page Fix
+
+**Goal:** Fix /profile/creators page to match /profile/actors behavior. The logic should be identical between both pages.
+
+**Status:** ✅ Planned
+
+**Plans:** 2/2 plans
+
+Plans:
+- [x] 23-01-PLAN.md — Fix API sorting (use creator_score) and TypeScript any types
+- [x] 23-02-PLAN.md — Fix Client Component parity (logger, type assertion, CineChance logo)
+
+---
+
 _For current project status, see .planning/PROJECT.md_

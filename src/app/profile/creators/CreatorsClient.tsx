@@ -4,8 +4,9 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Clapperboard } from 'lucide-react';
-import ImageWithProxy from '@/app/components/ImageWithProxy';
-import '@/app/profile/components/AchievementCards.css';
+ import ImageWithProxy from '@/app/components/ImageWithProxy';
+ import '@/app/profile/components/AchievementCards.css';
+ import { logger } from '@/lib/logger';
 
 interface CreatorAchievement {
   id: number;
@@ -27,6 +28,12 @@ interface CreatorsClientProps {
 const TOP_CREATORS_COUNT = 50;
 const DISPLAY_COUNT = 50;
 
+/**
+ * Skeleton loader component for a single creator card.
+ * Displayed while the creator data is loading.
+ * 
+ * @returns JSX element with animated placeholder for creator card
+ */
 function CreatorCardSkeleton() {
   return (
     <div className="animate-pulse">
@@ -37,6 +44,12 @@ function CreatorCardSkeleton() {
   );
 }
 
+/**
+ * Skeleton loader for the entire creators page.
+ * Displays a grid of placeholder cards while loading.
+ * 
+ * @returns JSX element with grid of animated creator card skeletons
+ */
 function PageSkeleton() {
   const skeletonCount = 12;
   return (
@@ -48,6 +61,37 @@ function PageSkeleton() {
   );
 }
 
+/**
+ * Client component for displaying user's favorite directors (creators).
+ * 
+ * Fetches director achievement data from the API and displays it in a responsive grid.
+ * Features:
+ * - Animated loading progress bar with stage messages
+ * - Lazy loading of images with blur-up effect
+ * - Dynamic grayscale/saturation based on progress percentage
+ * - Average rating display with CineChance logo
+ * - Progress bar showing how much of director's filmography has been watched
+ * 
+ * **Visual Effects:**
+ * - Progress 0-25%: High grayscale (100%), low saturation (0.1-0.6)
+ * - Progress 25-50%: Reducing grayscale, increasing saturation
+ * - Progress 50-75%: Moderate grayscale (50-20%), full saturation
+ * - Progress 75-90%: Low grayscale (20-10%), full saturation  
+ * - Progress 90-100%: Full color, enhanced presentation
+ * 
+ * **Edge Cases:**
+ * - Empty state: Displays message when no creators found
+ * - Error state: Shows error message with retry button
+ * - Timeout: Handles 120-second timeout with custom message for large watchlists
+ * - Missing profile: Shows clapperboard icon as fallback
+ * 
+ * @param props - Component props
+ * @param props.userId - The current user's ID for fetching their data
+ * @returns JSX element with creator grid or loading/error states
+ * 
+ * @example
+ * <CreatorsClient userId="user-123" />
+ */
 export default function CreatorsClient({ userId }: CreatorsClientProps) {
   const [creators, setCreators] = useState<CreatorAchievement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,14 +132,24 @@ export default function CreatorsClient({ userId }: CreatorsClientProps) {
           throw new Error(`API Error: ${response.status}`);
         }
 
-        const data = await response.json();
-        
-        if (progressIntervalRef.current) {
-          clearInterval(progressIntervalRef.current);
-        }
+         const data = await response.json() as { creators: CreatorAchievement[] };
+         
+         logger.debug('Creators API response', { data });
 
-        setCreators(data.creators || []);
-        setProgress(100);
+         if (progressIntervalRef.current) {
+           clearInterval(progressIntervalRef.current);
+         }
+
+         const creatorsData = data.creators || [];
+         logger.debug('Creators data received', { count: creatorsData.length });
+
+         // Log each creator's progress for debugging
+         creatorsData.forEach((creator: CreatorAchievement, index: number) => {
+           logger.debug('Creator progress', { index: index + 1, name: creator.name, watched: creator.watched_movies, total: creator.total_movies, progress: creator.progress_percent });
+         });
+
+         setCreators(creatorsData);
+         setProgress(100);
         
         setTimeout(() => setLoading(false), 300);
         
@@ -130,6 +184,20 @@ export default function CreatorsClient({ userId }: CreatorsClientProps) {
     };
   }, [userId]);
 
+  /**
+   * Returns a progress message based on the current loading percentage.
+   * Messages are in Russian and describe the current processing stage.
+   * 
+   * Progress stages:
+   * - 0-20%: Collecting creator information
+   * - 20-40%: Analyzing filmographies
+   * - 40-60%: Forming ratings
+   * - 60-80%: Preparing top lists
+   * - 80-95%: Loading photos
+   * - 95-100%: Finalizing
+   * 
+   * @returns Russian string describing current loading stage
+   */
   const getProgressMessage = () => {
     if (progress < 20) return '🎬 Собираем информацию о создателях...';
     if (progress < 40) return '📊 Анализируем фильмографии...';
@@ -139,6 +207,20 @@ export default function CreatorsClient({ userId }: CreatorsClientProps) {
     return '✨ Почти готово...';
   };
 
+  /**
+   * Returns a detailed subtext message explaining what processing is happening.
+   * Provides users with context about the lengthy calculation process.
+   * 
+   * Subtext stages mirror getProgressMessage but with more detail:
+   * - 0-20%: Learning movie preferences
+   * - 20-40%: Counting watched movies per creator
+   * - 40-60%: Ordering by ratings
+   * - 60-80%: Selecting favorite filmmakers
+   * - 80-95%: Preparing posters
+   * - 95-100%: Finalizing results
+   * 
+   * @returns Russian string with detailed progress explanation
+   */
   const getProgressSubtext = () => {
     if (progress < 20) return 'Изучаем ваши предпочтения в кино';
     if (progress < 40) return 'Считаем просмотренные фильмы каждого создателя';
@@ -148,10 +230,32 @@ export default function CreatorsClient({ userId }: CreatorsClientProps) {
     return 'Скоро покажем результат!';
   };
 
+  /**
+   * Callback handler for when a creator image finishes loading.
+   * Adds the creator ID to the set of loaded images to trigger
+   * the opacity transition from transparent to visible.
+   * 
+   * @param creatorId - TMDB ID of the creator whose image loaded
+   */
   const handleImageLoad = useCallback((creatorId: number) => {
     setLoadedImages(prev => new Set(prev).add(creatorId));
   }, []);
 
+  /**
+   * Determines if an image should be prioritized for loading.
+   * First 12 images are prioritized (preload) for better UX.
+   * 
+   * Uses Next.js Image priority prop for LCP optimization.
+   * Only the first 12 images in the grid get priority loading.
+   * 
+   * @param index - Position of the creator card in the grid (0-indexed)
+   * @returns true if image should be prioritized, false otherwise
+   * @example
+   * // First 12 cards get priority loading
+   * const priority = getImagePriority(0);  // true
+   * const priority = getImagePriority(11); // true
+   * const priority = getImagePriority(12); // false
+   */
   const getImagePriority = (index: number) => {
     return index < 12;
   };
@@ -310,14 +414,21 @@ export default function CreatorsClient({ userId }: CreatorsClientProps) {
                     <span>{creator.total_movies}</span>
                     {' фильмов'}
                   </p>
-                  {creator.average_rating !== null && (
-                    <span className="text-blue-400 text-xs flex items-center gap-0.5">
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                      </svg>
-                      {creator.average_rating}
-                    </span>
-                  )}
+                   {creator.average_rating !== null && (
+                     <div className="flex items-center bg-gray-800/50 rounded text-sm flex-shrink-0">
+                       <div className="w-5 h-5 relative mx-1">
+                         <Image
+                           src="/images/logo_mini_lgt.png"
+                           alt="CineChance Logo"
+                           fill
+                           className="object-contain"
+                         />
+                       </div>
+                       <span className="text-gray-200 font-medium pr-2">
+                         {creator.average_rating.toFixed(1)}
+                       </span>
+                     </div>
+                   )}
                 </div>
               </div>
             </Link>

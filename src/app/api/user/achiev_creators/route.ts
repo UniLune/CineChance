@@ -111,7 +111,9 @@ interface TMDBPersonCredits {
   crew: Array<{
     id: number;
     title: string;
-    release_date: string;
+    release_date?: string;
+    first_air_date?: string;
+    media_type?: string;
     job: string;
     department: string;
   }>;

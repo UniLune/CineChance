@@ -280,4 +280,92 @@ describe('AchievCreators API - Anime/Cartoon filtering consistency', () => {
     expect(director.watched_movies).toBe(0);
     expect(director.progress_percent).toBe(0);
   });
+
+  it('should filter average_rating to only include non-anime/cartoon movies', async () => {
+    // ARRANGE: Director with mixed filmography
+    // - 1 live-action movie rated 8
+    // - 1 anime movie rated 10
+    const directorId = 999;
+    const directorName = 'Mixed Rating Director';
+
+    const filmography = [
+      { id: 401, title: 'Live Action Movie', isAnime: false, isCartoon: false },
+      { id: 402, title: 'Anime Movie', isAnime: true, isCartoon: false },
+    ];
+
+    // User watched both movies with different ratings
+    // Need to modify the setup to include different ratings
+    const watchedMovies = [
+      { id: 401, title: 'Live Action Movie', isAnime: false, isCartoon: false },
+      { id: 402, title: 'Anime Movie', isAnime: true, isCartoon: false },
+    ];
+
+    // Setup mocks - but we need custom ratings
+    mockWatchListFindMany
+      .mockResolvedValueOnce([
+        { tmdbId: 401, mediaType: 'movie', userRating: 8 }, // Live-action rated 8
+        { tmdbId: 402, mediaType: 'movie', userRating: 10 }, // Anime rated 10
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    mockMovieCreditsMap.clear();
+    mockMediaDetailsMap.clear();
+
+    filmography.forEach((movie) => {
+      mockMovieCreditsMap.set(movie.id, {
+        id: movie.id,
+        crew: [
+          {
+            id: directorId,
+            name: directorName,
+            profile_path: null,
+            job: 'Director',
+            department: 'Directing',
+          },
+        ],
+      });
+
+      mockMediaDetailsMap.set(movie.id, {
+        id: movie.id,
+        title: movie.title,
+        genres: movie.isAnime || movie.isCartoon ? [{ id: 16, name: 'Animation' }] : [{ id: 28, name: 'Action' }],
+        original_language: movie.isAnime ? 'ja' : 'en',
+      });
+    });
+
+    setMockPersonCredits({
+      crew: filmography.map((movie) => ({
+        id: movie.id,
+        title: movie.title,
+        job: 'Director',
+        department: 'Directing',
+        media_type: 'movie',
+        release_date: '2020-01-01',
+      })),
+    });
+
+    mockFetch.mockClear();
+
+    // ACT
+    const req = createRequest('http://localhost/api/user/achiev_creators?limit=50&singleLoad=true');
+    const res = await GET(req);
+    const data = await res.json();
+
+    // ASSERT
+    expect(data.creators).toHaveLength(1);
+    const director = data.creators[0];
+
+    // total_movies should be 1 (only live-action after filter)
+    expect(director.total_movies).toBe(1);
+    
+    // watched_movies should be 1 (only live-action)
+    expect(director.watched_movies).toBe(1);
+    
+    // average_rating should be 8 (only from live-action, NOT 9 from (8+10)/2)
+    expect(director.average_rating).toBe(8);
+    
+    // progress should be 100%
+    expect(director.progress_percent).toBe(100);
+  });
 });

@@ -717,17 +717,44 @@ export async function GET(request: Request) {
                const rewatchedMovieIds = new Set(rewatchedMoviesData.map(m => m.tmdbId));
                const droppedMovieIds = new Set(droppedMoviesData.map(m => m.tmdbId));
                
+               // Создаем Map рейтингов для каждого tmdbId (включая rewatched)
+               const ratingsMap = new Map<number, number>();
+               for (const movie of watchedMoviesData) {
+                 if (movie.userRating !== null && movie.userRating !== undefined) {
+                   ratingsMap.set(movie.tmdbId, movie.userRating);
+                 }
+               }
+               for (const movie of rewatchedMoviesData) {
+                 if (movie.userRating !== null && movie.userRating !== undefined) {
+                   ratingsMap.set(movie.tmdbId, movie.userRating);
+                 }
+               }
+               
                // Пересекаем с отфильтрованной фильмографией (исключаем аниме/мультфильмы)
                // Теперь watched_movies, rewatched_movies, dropped_movies согласованы с total_movies
                let watchedMovies = 0;
                let rewatchedMovies = 0;
                let droppedMovies = 0;
+               const filteredRatings: number[] = [];
                
                for (const movieId of uniqueMovieIds) {
-                 if (watchedMovieIds.has(movieId)) watchedMovies++;
-                 if (rewatchedMovieIds.has(movieId)) rewatchedMovies++;
+                 if (watchedMovieIds.has(movieId)) {
+                   watchedMovies++;
+                   const rating = ratingsMap.get(movieId);
+                   if (rating !== undefined) filteredRatings.push(rating);
+                 }
+                 if (rewatchedMovieIds.has(movieId)) {
+                   rewatchedMovies++;
+                   const rating = ratingsMap.get(movieId);
+                   if (rating !== undefined) filteredRatings.push(rating);
+                 }
                  if (droppedMovieIds.has(movieId)) droppedMovies++;
                }
+               
+               // Пересчитываем average_rating только по отфильтрованным (не-аниме/мультфильмам) фильмам
+               const averageRating = filteredRatings.length > 0
+                 ? Number((filteredRatings.reduce((a, b) => a + b, 0) / filteredRatings.length).toFixed(1))
+                 : null;
                
                const progressPercent = totalMovies > 0 
                  ? Math.round((watchedMovies / totalMovies) * 100)
@@ -742,6 +769,8 @@ export async function GET(request: Request) {
                 watchedMovies,
                 rewatchedMovies,
                 droppedMovies,
+                filteredRatingsCount: filteredRatings.length,
+                averageRating,
                 progressPercent,
               });
 
@@ -751,6 +780,7 @@ export async function GET(request: Request) {
                 watched_movies: watchedMovies,
                 rewatched_movies: rewatchedMovies,
                 dropped_movies: droppedMovies,
+                average_rating: averageRating,
                 progress_percent: progressPercent,
               };
             } catch (error) {

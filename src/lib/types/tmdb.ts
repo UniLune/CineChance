@@ -112,6 +112,8 @@ export interface TMDbCollectionPart {
   vote_count: number;
   release_date?: string;
   overview: string;
+  genre_ids?: number[];
+  original_language?: string;
 }
 
 /**

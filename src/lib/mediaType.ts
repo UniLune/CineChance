@@ -34,20 +34,34 @@ const TV_COLOR = '#3b82f6';
  * @returns MediaTypeConfig - Display configuration for the card badge
  */
 export function getMediaTypeDisplay(movie: Media): MediaTypeConfig {
-  const hasAnimationGenre = movie.genre_ids?.includes(16);
+  const hasAnimationGenre = movie.genre_ids?.includes(16) ?? false;
   const isJapanese = movie.original_language === 'ja';
 
+  console.log('[getMediaTypeDisplay] Analyzing movie:', {
+    id: movie.id,
+    title: movie.title || movie.name,
+    genre_ids: movie.genre_ids,
+    hasAnimationGenre,
+    original_language: movie.original_language,
+    isJapanese,
+    media_type: movie.media_type,
+  });
+
   if (hasAnimationGenre && isJapanese) {
+    console.log('[getMediaTypeDisplay] Result: АНИМЕ');
     return { label: 'Аниме', backgroundColor: ANIME_COLOR, isAnime: true, isAnimated: false, displayType: 'anime' };
   }
 
   if (hasAnimationGenre && !isJapanese) {
+    console.log('[getMediaTypeDisplay] Result: МУЛЬТ');
     return { label: 'Мульт', backgroundColor: ANIMATED_COLOR, isAnime: false, isAnimated: true, displayType: 'animated' };
   }
 
   if (movie.media_type === 'movie') {
+    console.log('[getMediaTypeDisplay] Result: ФИЛЬМ');
     return { label: 'Фильм', backgroundColor: MOVIE_COLOR, isAnime: false, isAnimated: false, displayType: 'movie' };
   }
 
+  console.log('[getMediaTypeDisplay] Result: СЕРИАЛ');
   return { label: 'Сериал', backgroundColor: TV_COLOR, isAnime: false, isAnimated: false, displayType: 'tv' };
 }

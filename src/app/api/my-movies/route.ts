@@ -29,7 +29,13 @@ interface SortableMovie {
 // Helper function to get TMDB details
 async function fetchMediaDetails(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<TMDbMovie | TMDbTV | null> {
   const apiKey = process.env.TMDB_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    logger.warn('TMDB API key not configured', {
+      context: 'my-movies',
+      tmdbId,
+    });
+    return null;
+  }
   const url = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}?api_key=${apiKey}&language=ru-RU`;
   try {
     const controller = new AbortController();
@@ -42,9 +48,44 @@ async function fetchMediaDetails(tmdbId: number, mediaType: 'movie' | 'tv'): Pro
     
     clearTimeout(timeoutId);
     
-    if (!res.ok) return null;
-    return await res.json() as TMDbMovie | TMDbTV;
-  } catch {
+    if (!res.ok) {
+      logger.warn('TMDB fetch failed', {
+        context: 'my-movies',
+        tmdbId,
+        status: res.status,
+      });
+      return null;
+    }
+    const data = await res.json() as TMDbMovie | TMDbTV;
+    
+    // IMPORTANT: TMDB movie/{id} and tv/{id} endpoints return genres array, not genre_ids!
+    // Convert genres to genre_ids for consistency with search API
+    if (!data.genre_ids && data.genres && Array.isArray(data.genres)) {
+      data.genre_ids = data.genres.map((g: any) => g.id);
+    }
+    
+    // Detailed logging
+    console.log(`[TMDB FETCH] id=${tmdbId} type=${mediaType}`, {
+      title: data.title || data.name,
+      genre_ids_length: data.genre_ids?.length || 0,
+      genre_ids: data.genre_ids,
+      original_language: data.original_language,
+      has_genres: Boolean(data.genre_ids && data.genre_ids.length > 0),
+    });
+    
+    logger.debug('TMDB fetch successful', {
+      context: 'my-movies',
+      tmdbId,
+      genre_ids: data.genre_ids,
+      original_language: data.original_language,
+    });
+    return data;
+  } catch (error) {
+    logger.warn('fetchMediaDetails error', {
+      context: 'my-movies',
+      tmdbId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
@@ -487,6 +528,23 @@ export async function GET(request: NextRequest) {
       const cineChanceRating = cineChanceData?.averageRating || null;
       const cineChanceVotes = cineChanceData?.count || 0;
 
+      // DEBUG: Log if tmdbData is null
+      if (!tmdbData) {
+        logger.warn('tmdbData is null!', {
+          context: 'my-movies',
+          tmdbId: record.tmdbId,
+          mediaType: record.mediaType,
+        });
+      } else {
+        logger.debug('tmdbData received', {
+          context: 'my-movies',
+          tmdbId: record.tmdbId,
+          hasGenreIds: Boolean(tmdbData.genre_ids && tmdbData.genre_ids.length > 0),
+          genre_ids: tmdbData.genre_ids,
+          original_language: tmdbData.original_language,
+        });
+      }
+
       const combinedRating = calculateCineChanceScore({
         tmdbRating: tmdbData?.vote_average || 0,
         tmdbVotes: tmdbData?.vote_count || 0,
@@ -512,7 +570,7 @@ export async function GET(request: NextRequest) {
         averageRating: cineChanceRating,
         ratingCount: cineChanceVotes,
         addedAt: record.addedAt?.toISOString() || '',
-        userRating: record.weightedRating ?? record.userRating, // Fallback на взвешенную оценку
+        userRating: record.weightedRating ?? record.userRating,
         tags: record.tags || [],
       };
     });
@@ -550,7 +608,10 @@ export async function GET(request: NextRequest) {
       paginatedMoviesLength: paginatedMovies.length,
       hasMore,
       pageStartIndex,
-      pageEndIndex
+      pageEndIndex,
+      // Log first movie for debugging
+      firstMovieId: paginatedMovies.length > 0 ? paginatedMovies[0].id : undefined,
+      firstMovieRating: paginatedMovies.length > 0 ? paginatedMovies[0].combinedRating : undefined,
     });
 
     return NextResponse.json({

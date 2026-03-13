@@ -6,6 +6,27 @@
 
 ---
 
+## 🔴 Свежие Исправления (2025-01-28)
+
+### 0. TMDB API: Отсутствие genre_ids в Details Endpoints
+**Файл:** [`2025-01-28-tmdb-genre-ids-conversion.md`](./2025-01-28-tmdb-genre-ids-conversion.md)
+
+**Проблема:** На `/my-movies` и `/collection` страницах Аниме показывались как "Фильм", Мультфильмы как "Сериал"
+
+**Причина:** TMDB API возвращает разные структуры:
+- `search/multi` → `genre_ids: number[]` ✓
+- `movie/{id}` → `genres: {id, name}[]` ✗ (нет `genre_ids`)
+
+Код ожидал `genre_ids`, получал `undefined`, использовал fallback `[]`
+
+**Решение:** Автоматическое преобразование `genres` в `genre_ids` в обоих API маршрутизаторах
+
+**Затронутые файлы:**
+- `src/app/api/my-movies/route.ts` - fetchMediaDetails добавлен конверт genres→genre_ids
+- `src/app/api/collection/[id]/route.ts` - fetchMediaDetails добавлен конверт genres→genre_ids
+
+---
+
 ## 🔴 Свежие Исправления (2025-01-27)
 
 ### 1. Twin Tasters: Три Паттерна Совпадения Оценок

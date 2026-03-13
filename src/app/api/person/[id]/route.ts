@@ -167,8 +167,6 @@ export async function GET(
          department: item.department || '',
          role_type: item.role_type,
          popularity: item.popularity,
-          genre_ids: item.genre_ids,
-          original_language: item.original_language,
        })) || [];
 
     return NextResponse.json({

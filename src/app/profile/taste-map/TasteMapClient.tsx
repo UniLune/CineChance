@@ -1,25 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts';
-import type { TasteMap, ActorData, DirectorData } from '@/lib/taste-map/types';
-import { logger } from '@/lib/logger';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
+import type { TasteMap } from '@/lib/taste-map/types';
 import TwinTasters from './TwinTasters';
 
 interface TasteMapClientProps {
   tasteMap: TasteMap | null;
   userId: string;
+  topActors: Array<[string, number]>;
+  topDirectors: Array<[string, number]>;
 }
 
 const COLORS = {
@@ -31,89 +20,9 @@ const COLORS = {
   blue: '#3b82f6', // blue-500
 };
 
-export default function TasteMapClient({ tasteMap, userId }: TasteMapClientProps) {
-  const [topActors, setTopActors] = useState<Array<[string, number]>>([]);
-  const [topDirectors, setTopDirectors] = useState<Array<[string, number]>>([]);
-  const [loadingActors, setLoadingActors] = useState(false);
-  const [loadingDirectors, setLoadingDirectors] = useState(false);
+export default function TasteMapClient({ tasteMap, userId, topActors, topDirectors }: TasteMapClientProps) {
+  // No local state for persons - data comes from server props
 
-  // Load actors from PersonProfile table
-  useEffect(() => {
-    const loadActors = async () => {
-      setLoadingActors(true);
-      try {
-        const response = await fetch(`/api/user/person-profile?personType=actor&limit=10`);
-        if (response.ok) {
-          const data = await response.json();
-          const actorsList: Array<[string, number]> = (data.persons || []).map(
-            (person: { name: string; avgWeightedRating: number }) => [
-              person.name,
-              person.avgWeightedRating,
-            ]
-          );
-          setTopActors(actorsList);
-        } else {
-          // Fallback to old API if PersonProfile empty
-          const fallbackResponse = await fetch(`/api/user/achiev_actors?limit=10&singleLoad=true&offset=0`);
-          if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json();
-            const actorsList: Array<[string, number]> = (data.actors || [])
-              .slice(0, 10)
-              .map((actor: ActorData) => [
-                actor.name,
-                actor.average_rating ?? 0,
-              ]);
-            setTopActors(actorsList);
-          }
-        }
-      } catch (error) {
-        logger.debug('Failed to load actors', { error, context: 'TasteMapClient' });
-      } finally {
-        setLoadingActors(false);
-      }
-    };
-    
-    loadActors();
-  }, [userId]);
-
-  // Load directors from PersonProfile table
-  useEffect(() => {
-    const loadDirectors = async () => {
-      setLoadingDirectors(true);
-      try {
-        const response = await fetch(`/api/user/person-profile?personType=director&limit=10`);
-        if (response.ok) {
-          const data = await response.json();
-          const directorsList: Array<[string, number]> = (data.persons || []).map(
-            (person: { name: string; avgWeightedRating: number }) => [
-              person.name,
-              person.avgWeightedRating,
-            ]
-          );
-          setTopDirectors(directorsList);
-        } else {
-          // Fallback to old API if PersonProfile empty
-          const fallbackResponse = await fetch(`/api/user/achiev_creators?limit=10&singleLoad=true&offset=0`);
-          if (fallbackResponse.ok) {
-            const data = await fallbackResponse.json();
-            const directorsList: Array<[string, number]> = (data.creators || [])
-              .slice(0, 10)
-              .map((creator: DirectorData) => [
-                creator.name,
-                creator.average_rating ?? 0,
-              ]);
-            setTopDirectors(directorsList);
-          }
-        }
-      } catch (error) {
-        logger.debug('Failed to load directors', { error, context: 'TasteMapClient' });
-      } finally {
-        setLoadingDirectors(false);
-      }
-    };
-    
-    loadDirectors();
-  }, [userId]);
   // Empty state
   if (!tasteMap || Object.keys(tasteMap.genreProfile).length === 0) {
     return (
@@ -260,9 +169,7 @@ export default function TasteMapClient({ tasteMap, userId }: TasteMapClientProps
       <div className="bg-gray-900 rounded-lg p-6">
         <h2 className="text-xl font-semibold text-white mb-4">Любимые актеры</h2>
         <div className="flex flex-wrap gap-2">
-          {loadingActors ? (
-            <p className="text-gray-400">Загрузка...</p>
-          ) : topActors.length > 0 ? (
+          {topActors.length > 0 ? (
             topActors.map(([name, score]) => (
               <a
                 key={name}
@@ -282,9 +189,7 @@ export default function TasteMapClient({ tasteMap, userId }: TasteMapClientProps
       <div className="bg-gray-900 rounded-lg p-6">
         <h2 className="text-xl font-semibold text-white mb-4">Любимые режиссеры</h2>
         <div className="flex flex-wrap gap-2">
-          {loadingDirectors ? (
-            <p className="text-gray-400">Загрузка...</p>
-          ) : topDirectors.length > 0 ? (
+          {topDirectors.length > 0 ? (
             topDirectors.map(([name, score]) => (
               <a
                 key={name}

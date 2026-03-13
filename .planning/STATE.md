@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-02-17)
 
 **Core value:** Personal movie tracking with intelligent recommendations
-**Current focus:** Phase 20 Complete - Ready for next phase
+**Current focus:** Phase 24 Complete - Ready for next phase
 
 ## Current Status
 
-- **Phase:** 23 (Profile Creators Page Fix)
+- **Phase:** 24 (Taste Map DB Read Fix)
 - **Current Plan:** Ready to execute
-- **Goal:** Enable strict TypeScript mode and eliminate any types
+- **Goal:** Ensure taste-map reads actors/directors from PersonProfile DB table
 
 ## Progress
 
@@ -30,6 +30,8 @@ See: .planning/PROJECT.md (updated 2026-02-17)
 | 18 | Карта вкуса | ● Complete | 0 |
 | 19 | Testing Foundation | ● Complete | 0 |
 | 20 | Strict TypeScript | ● Complete | QUAL-01, QUAL-02, QUAL-03 |
+| 23 | Profile Creators Page Fix | ● Complete | 0 |
+| 24 | Taste Map DB Read Fix | ● Complete | DATA-01 |
 
 ---
 
@@ -111,3 +113,11 @@ See: .planning/PROJECT.md (updated 2026-02-17)
 - **20-01:** Completed (~15 min) - Enabled strict TypeScript, verified production-grade linting, fixed collection route scoping. Prepared for systematic any elimination.
 - **20-02:** Completed (1 hour) - Eliminated all 180 `any` types across 50+ files. Achieved zero `any` count, clean TypeScript compilation, and passing ESLint. Created comprehensive TMDB type definitions and unified type patterns. Fixed complex ActorEntry reconstruction, duplicate AdditionalFilters types, and BatchData typing issues.
 - **20-03:** Completed (3 min) - Final verification: TypeScript compiles with zero errors (npx tsc --noEmit passes), ESLint passes with zero warnings, production build succeeds (68 pages), all 167 tests pass, manual smoke testing confirms pages and APIs work correctly.
+
+### Phase 24 Notes
+- **Problem**: TasteMapClient fetched actors/directors from `/api/user/person-profile` (could recompute if stale), while actors/creators pages write to `PersonProfile` table but display different data from legacy APIs.
+- **Solution**: Server-side read from `PersonProfile` directly in `page.tsx`, pass as props to client. No client-side fetching, no TMDB calls.
+- **Result**: Data consistency achieved across all profile pages. Actors/directors on taste-map now exactly match stored DB values.
+- **Performance**: Reduced 2 API calls per page load, eliminated client-side loading states.
+
+- **24-01:** Completed (45 min) - Modified `page.tsx` to read PersonProfile via Prisma, updated `TasteMapClient` to accept props, removed useEffect hooks, added unit and integration tests, verified lint and test suite.

@@ -1,3 +1,43 @@
+// Helper function to fetch TMDB media details
+async function fetchMediaDetails(tmdbId: number, mediaType: 'movie' | 'tv'): Promise<{
+  genre_ids: number[];
+  original_language: string;
+} | null> {
+  const apiKey = process.env.TMDB_API_KEY;
+  if (!apiKey) return null;
+
+  const url = `https://api.themoviedb.org/3/${mediaType}/${tmdbId}?api_key=${apiKey}&language=ru-RU`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const res = await fetch(url, {
+      next: { revalidate: 86400 },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    return {
+      genre_ids: data.genre_ids || [],
+      original_language: data.original_language || '',
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.warn('Failed to fetch TMDB details for movie in collection', {
+      tmdbId,
+      mediaType,
+      error: errorMessage,
+      context: 'CollectionAPI'
+    });
+    return null;
+  }
+}
+
 // src/app/api/collection/[id]/route.ts
 
 import { NextResponse } from 'next/server';

@@ -187,7 +187,25 @@ export default function MovieCard({
   const date = movie.release_date || movie.first_air_date;
   const year = date ? date.split('-')[0] : '—';
   
-  const mediaTypeConfig = useMemo(() => getMediaTypeDisplay(movie), [movie]);
+  // DEBUG: Log movie data for media type detection
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[MovieCard DEBUG]', {
+      id: movie.id,
+      title: movie.title,
+      genre_ids: movie.genre_ids,
+      original_language: movie.original_language,
+      media_type: movie.media_type,
+    });
+  }
+  
+  const mediaTypeConfig = useMemo(() => {
+    const config = getMediaTypeDisplay(movie);
+    // DEBUG: Log result
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[MovieCard] getMediaTypeDisplay result:', config);
+    }
+    return config;
+  }, [movie]);
 
   const combinedRating = useMemo(() => {
     return calculateCineChanceScore({

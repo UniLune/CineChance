@@ -8,7 +8,6 @@ import { MOVIE_STATUS_IDS } from '@/lib/movieStatusConstants';
 import { computeSimilarity } from '@/lib/taste-map/similarity';
 import { getTasteMap } from '@/lib/taste-map/redis';
 import { computeTasteMap } from '@/lib/taste-map/compute';
-import { comparePersonProfiles } from '@/lib/taste-map/person-comparison';
 import { computeAndStoreSimilarityScore } from '@/lib/taste-map/similarity-storage';
 
 // Only compare watched/rewatched movies for accurate taste comparison
@@ -149,12 +148,6 @@ export async function GET(
       })
       .sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference));
 
-    // Compare person profiles (actors and directors)
-    const personComparison = comparePersonProfiles(
-      currentTasteMap.personProfiles,
-      comparedTasteMap.personProfiles
-    );
-
     return NextResponse.json({
       userId: currentUserId,
       comparedUserId,
@@ -166,12 +159,11 @@ export async function GET(
         genreRatingSimilarity: similarityResult.genreRatingSimilarity,
       },
       ratingPatterns: similarityResult.ratingPatterns,
-      genreProfiles: {
-        current: currentTasteMap.genreProfile,
-        compared: comparedTasteMap.genreProfile,
-      },
-      personComparison,
-      myWatchedCount: currentCount,
+       genreProfiles: {
+         current: currentTasteMap.genreProfile,
+         compared: comparedTasteMap.genreProfile,
+       },
+       myWatchedCount: currentCount,
       theirWatchedCount: comparedCount,
       commonWatchedCount: sharedMovies.length,
       sharedMovies: sharedMovies,

@@ -136,9 +136,8 @@ export default function TwinTasters({ userId }: TwinTastersProps) {
         <div className="mb-4 p-4 bg-blue-900/30 border border-blue-700 rounded-lg text-xs text-blue-200">
           <p className="font-semibold mb-2">Как рассчитывается сходство:</p>
           <ul className="space-y-1 text-blue-300">
-            <li>🎬 <strong>Совпадение по фильмам (50%)</strong> - совпадение оценок на одинаковые фильмы</li>
-            <li>🎭 <strong>Жанры (30%)</strong> - сходство предпочитаемых жанров фильмов</li>
-            <li>👥 <strong>Персоны (20%)</strong> - пересечение любимых актеров и режиссеров</li>
+            <li>🎬 <strong>Совпадение по фильмам (40%)</strong> - совпадение оценок на одинаковые фильмы</li>
+            <li>🎭 <strong>Жанры (60%)</strong> - сходство предпочитаемых жанров фильмов</li>
           </ul>
         </div>
       )}

@@ -7,8 +7,6 @@ import TwinTasters from './TwinTasters';
 interface TasteMapClientProps {
   tasteMap: TasteMap | null;
   userId: string;
-  topActors: Array<[string, number]>;
-  topDirectors: Array<[string, number]>;
 }
 
 const COLORS = {
@@ -20,7 +18,7 @@ const COLORS = {
   blue: '#3b82f6', // blue-500
 };
 
-export default function TasteMapClient({ tasteMap, userId, topActors, topDirectors }: TasteMapClientProps) {
+export default function TasteMapClient({ tasteMap, userId }: TasteMapClientProps) {
   // No local state for persons - data comes from server props
 
   // Empty state
@@ -163,49 +161,9 @@ export default function TasteMapClient({ tasteMap, userId, topActors, topDirecto
             </PieChart>
           </ResponsiveContainer>
         </div>
-      </div>
+       </div>
 
-      {/* Top Actors */}
-      <div className="bg-gray-900 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">Любимые актеры</h2>
-        <div className="flex flex-wrap gap-2">
-          {topActors.length > 0 ? (
-            topActors.map(([name, score]) => (
-              <a
-                key={name}
-                href="/profile/actors"
-                className="bg-amber-900/30 text-amber-400 px-3 py-1 rounded-full text-sm border border-amber-700/50 hover:bg-amber-900/50 transition-colors"
-              >
-                {name} ({score > 0 ? score.toFixed(1) : '—'})
-              </a>
-            ))
-          ) : (
-            <p className="text-gray-400">Нет данных об актерах</p>
-          )}
-        </div>
-      </div>
-
-      {/* Top Directors */}
-      <div className="bg-gray-900 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">Любимые режиссеры</h2>
-        <div className="flex flex-wrap gap-2">
-          {topDirectors.length > 0 ? (
-            topDirectors.map(([name, score]) => (
-              <a
-                key={name}
-                href="/profile/creators"
-                className="bg-blue-900/30 text-blue-400 px-3 py-1 rounded-full text-sm border border-blue-700/50 hover:bg-blue-900/50 transition-colors"
-              >
-                {name} ({score > 0 ? score.toFixed(1) : '—'})
-              </a>
-            ))
-          ) : (
-            <p className="text-gray-400">Нет данных о режиссерах</p>
-          )}
-        </div>
-      </div>
-
-      {/* Computed Metrics Details */}
+       {/* Computed Metrics Details */}
       <div className="bg-gray-900 rounded-lg p-6">
         <h2 className="text-xl font-semibold text-white mb-4">Метрики профиля</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

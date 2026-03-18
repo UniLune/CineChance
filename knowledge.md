@@ -12,20 +12,21 @@
 - Prisma.Json type usage with explicit casting (`as unknown as T[]`) for arrays
 - Map/Set iteration requires ES2015+ target (cannot downlevel to ES5 without downlevelIteration flag)
 - **Modular recommendation pipeline** - Composable algorithms with fallback chain (8 patterns implementing IRecommendationAlgorithm)
-- **TasteMap compute pipeline** - Scheduler computes SimilarityScore weekly; on-demand caching (24h TTL)
+- **TasteMap compute pipeline** - Scheduler computes SimilarityScore weekly; on-demand caching (24h TTL); includes genre profile, rating distribution, person profiles (to be deprecated), behavior profile
 - **ML feedback loop** - Decision logging → outcome tracking → model correction (RecommendationDecision, PredictionOutcome, ModelCorrection)
 - **Confidence scoring** - Formula: base 50 + algorithmCount*5 + adjustments (max 90), penalties for cold start (-30), heavy user sampling (-10)
 - **Client-side scroll tracking** - useState + useEffect with window scroll listener; conditional rendering of Scroll-to-Top button (search page)
 - **Conditional prop passing** - Use optional props (index?: number) to selectively enable/disable features without breaking consumers
+- **Similarity weight distribution** - Configurable weights for overallMatch: genres, movies (rating correlation), persons (to be removed in Phase 25)
 
 ## Критические файлы
 - prisma/schema.prisma — 20+ моделей, композитные ключи
 - src/lib/prisma.ts — singleton PrismaClient
 - src/auth.ts — NextAuth конфигурация
 - src/middleware/rateLimit.ts — rate limiting архитектура
-- src/lib/taste-map/person-profile-v2.ts — Prisma.Json casting issues, requires strict type handling
-- src/lib/taste-map/compute.ts — Map iteration (fixed by target es2017)
-- src/lib/taste-map/similarity.ts — Set iteration + incomplete RatingMatchPatterns type
+- src/lib/taste-map/person-profile-v2.ts — Prisma.Json casting issues, requires strict type handling; **TO BE DEPRECATED in Phase 25**
+- src/lib/taste-map/compute.ts — Map iteration (fixed by target es2017); contains computePersonProfile (to be removed)
+- src/lib/taste-map/similarity.ts — Set iteration + incomplete RatingMatchPatterns type; personOverlap calculation (to be removed in Phase 25)
 - src/lib/recommendation-algorithms/interface.ts — Algorithm interface; all 8 patterns depend on it
 - src/lib/recommendation-algorithms.ts — Main orchestrator; merge logic and confidence scoring
 - src/app/api/recommendations/[id]/action/route.ts — Outcome tracking; links RecommendationLog to PredictionOutcome
@@ -56,6 +57,7 @@
 - **TMDB API dependency** — Missing API key or rate limits cause failures; ISR cache and graceful degradation in place
 - **Scroll-to-top code duplication** - Current implementation exists in both search and will be added to my-movies; should be extracted to reusable hook/component in future (maintainability risk)
 - **showIndex prop impact** - Adding optional showIndex to FilmGridWithFilters requires validation that all 4 usage sites behave correctly (my-movies hide, stats show)
+- **Person profile complexity** - TasteMap includes actor/director top-50 profiles requiring TMDB credits per movie (2 API calls per movie), MoviePersonCache table, incremental update logic, PersonProfile storage; significantly complicates compute pipeline and adds external dependencies (Phase 25 simplification planned: remove persons, keep schema, adjust similarity weights to 60% genres + 40% movies)
 
 ## Зависимости и интеграции
 - Frontend: Next.js 16 → React 19 → Tailwind CSS 4
@@ -64,7 +66,7 @@
 - Кэширование: Upstash Redis + TMDB ISR
 - Auth flow: User → Session → WatchList → RatingHistory → RecommendationLog
 - **Algorithm pipeline**: 8 patterns (Taste Match, Want Overlap, Drop Patterns, Type Twins, Genre Twins, Genre Recommendations, Person Twins, Person Recommendations) → merge → confidence score
-- **TasteMap integration**: Used by algorithms for similarity computation (SimilarityScore DB table, Redis cache)
+- **TasteMap integration (Phase 25 simplification pending)**: Used by algorithms for similarity computation; includes genre profile, rating distribution, behavior profile. Person profiles (actors/directors) to be removed, reducing TMDB API dependency and simplifying compute pipeline. SimilarityScore weights will change from (50% movies, 30% genres, 20% persons) to (40% movies, 60% genres).
 - **Outcome tracking**: RecommendationDecision → PredictionOutcome; feeds ModelCorrection and acceptance rate metrics
 - **FilmGridWithFilters**: Universal grid component used across 4 pages; accepts fetchMovies callback and manages filters/infinite scroll centrally
 
@@ -88,6 +90,7 @@
 - **Weekly SimilarityScore recomputation:** Balances freshness vs performance; on-demand fallback for immediate needs
 - **Optional index prop for MovieCard:** Allows disabling serial numbers without breaking existing consumers; use showIndex flag in FilmGridWithFilters to control (2026-03-11 research)
 - **Scroll-to-top pattern:** Client-side scroll tracking with useEffect + event listener; threshold 300px; fixed position button (from SearchClient implementation)
+- **Remove person profiles from TasteMap (Phase 25 decision):** Persons require TMDB credits per movie (2 API calls each), complex incremental updates, and MoviePersonCache table; simplify by removing actors/directors from taste map calculations and UI while preserving DB schema for future use. Weights change to 60% genres + 40% movies. Reduces API dependency and compute time significantly.
 
 ## Типы и интерфейсы
 - Movie, TVShow, Person — TMDB типы (implicit any currently, to be defined)

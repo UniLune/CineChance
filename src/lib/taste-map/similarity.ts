@@ -26,7 +26,7 @@ export const TTL_24H = 86400;
 const COMPLETED_STATUS_IDS = [MOVIE_STATUS_IDS.WATCHED, MOVIE_STATUS_IDS.REWATCHED];
 
 // Dropped status - excluded from rating analysis
-const DROPPED_STATUS_ID = MOVIE_STATUS_IDS.DROPPED;
+
 
 // Rating thresholds for pattern analysis
 export const RATING_THRESHOLDS = {
@@ -43,17 +43,17 @@ export const RATING_THRESHOLDS = {
 } as const;
 
 // Weights for overall match
-// - Movies (rating correlation): 50% (most important)
-// - Genres: 30%
-// - Persons: 20% (least important)
+// - Movies (rating correlation): 40%
+// - Genres: 60%
+// - Persons: removed (no longer used)
 const WEIGHTS = {
-  tasteSimilarity: 0.3,      // Genres
-  ratingCorrelation: 0.5,    // Movies
-  personOverlap: 0.2,        // Persons
+  tasteSimilarity: 0.6,      // Genres
+  ratingCorrelation: 0.4,    // Movies
+  // personOverlap removed
 };
 
 // Similarity threshold from CONTEXT.md
-const SIMILARITY_THRESHOLD = 0.7;
+
 
 /**
  * Rating match patterns showing how aligned users' taste are
@@ -351,24 +351,23 @@ export function personOverlap(
 
 /**
  * Compute overall match score from similarity result
- * Uses weights: Movies 0.5, Genres 0.3, Persons 0.2
- * 
+ * Formula: overallMatch = movieScore * 0.4 + tasteSimilarity * 0.6
+ *
  * Priority:
  * 1. If ratingPatterns available: use overallMovieMatch (% perfect+close ratings)
  * 2. Otherwise: use normalized ratingCorrelation (Pearson, -1 to 1 → 0 to 1)
- * 
- * This matches the client-side calculation on comparison page.
+ *
+ * Note: personOverlap is intentionally ignored (removed from weights)
  */
 export function computeOverallMatch(result: SimilarityResult): number {
   // Use overallMovieMatch from patterns if available (0-1 scale)
   // Otherwise fall back to normalized rating correlation
-  const movieScore = result.ratingPatterns?.overallMovieMatch ?? 
+  const movieScore = result.ratingPatterns?.overallMovieMatch ??
     ((result.ratingCorrelation + 1) / 2);
-  
+
   return (
-    movieScore * WEIGHTS.ratingCorrelation +       // Movies: 0.5
-    result.tasteSimilarity * WEIGHTS.tasteSimilarity +  // Genres: 0.3
-    result.personOverlap * WEIGHTS.personOverlap   // Persons: 0.2
+    movieScore * WEIGHTS.ratingCorrelation +
+    result.tasteSimilarity * WEIGHTS.tasteSimilarity
   );
 }
 

@@ -30,7 +30,6 @@ export async function computeAndStoreSimilarityScore(
   try {
     // Ensure consistent ordering (userIdA < userIdB)
     const [orderedA, orderedB] = userIdA < userIdB ? [userIdA, userIdB] : [userIdB, userIdA];
-    const isReversed = orderedA !== userIdA;
 
     // Load taste maps with caching
     const [tasteMapA, tasteMapB] = await Promise.all([
@@ -247,15 +246,11 @@ export async function getCandidateUsersForSimilarity(
 
 /**
  * Generate a snapshot of taste map for reproducibility
- * Only stores essential data: genre profile and person profiles
+ * Only stores essential data: genre profile (persons removed for simplification)
  */
 export function generateTasteMapSnapshot(tasteMap: TasteMap): object {
   return {
     genreProfile: tasteMap.genreProfile,
-    personProfiles: {
-      actors: tasteMap.personProfiles.actors,
-      directors: tasteMap.personProfiles.directors,
-    },
   };
 }
 

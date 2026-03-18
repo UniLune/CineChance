@@ -38,26 +38,6 @@ interface SharedMovie {
   difference: number;
 }
 
-interface PersonOverlapDetail {
-  name: string;
-  userScore: number;
-  comparedScore: number;
-  average: number;
-}
-
-interface PersonSet {
-  mutual: PersonOverlapDetail[];
-  onlyInUser: PersonOverlapDetail[];
-  onlyInCompared: PersonOverlapDetail[];
-  jaccardIndex: number;
-}
-
-interface PersonComparisonResult {
-  actors: PersonSet;
-  directors: PersonSet;
-  overallMatch: number;
-}
-
 interface ComparisonData {
   userId: string;
   comparedUserId: string;
@@ -67,7 +47,6 @@ interface ComparisonData {
     current: Record<string, number>;
     compared: Record<string, number>;
   };
-  personComparison?: PersonComparisonResult;
   sharedMovies: SharedMovie[];
   myWatchedCount: number;
   theirWatchedCount: number;
@@ -207,37 +186,20 @@ export default function ComparisonPage() {
         </div>
 
         {/* Overall Match Card */}
-        {(() => {
-          // Calculate components
-          const genreScore = comparison.metrics.tasteSimilarity;
-          const personScore = comparison.personComparison 
-            ? (comparison.personComparison.actors.jaccardIndex + comparison.personComparison.directors.jaccardIndex) / 2
-            : comparison.metrics.personOverlap;
-          const movieScore = comparison.ratingPatterns?.overallMovieMatch || 0;
-          
-          // Weighted overall match:
-          // - Movies: 50% (most important)
-          // - Genres: 30%
-          // - Persons: 20% (least important)
-          const overallMatch = (movieScore * 0.5) + (genreScore * 0.3) + (personScore * 0.2);
-          
-          return (
-            <div className={`border rounded-lg p-8 mb-8 ${getMatchBgColor(overallMatch * 100)}`}>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-white">Общее совпадение</h2>
-                <div className={`text-4xl font-bold ${getMatchColor(overallMatch * 100)}`}>
-                  {(overallMatch * 100).toFixed(0)}%
-                </div>
-              </div>
-              <div className="w-full bg-gray-800 rounded-full h-4 overflow-hidden">
-                <div
-                  className="bg-gradient-to-r from-purple-500 to-blue-500 h-full transition-all duration-300"
-                  style={{ width: `${overallMatch * 100}%` }}
-                />
-              </div>
+        <div className={`border rounded-lg p-8 mb-8 ${getMatchBgColor(comparison.metrics.overallMatch * 100)}`}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-white">Общее совпадение</h2>
+            <div className={`text-4xl font-bold ${getMatchColor(comparison.metrics.overallMatch * 100)}`}>
+              {(comparison.metrics.overallMatch * 100).toFixed(0)}%
             </div>
-          );
-        })()}
+          </div>
+          <div className="w-full bg-gray-800 rounded-full h-4 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-purple-500 to-blue-500 h-full transition-all duration-300"
+              style={{ width: `${comparison.metrics.overallMatch * 100}%` }}
+            />
+          </div>
+        </div>
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -316,30 +278,7 @@ export default function ComparisonPage() {
             </div>
           )}
 
-          {/* Person Overlap */}
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-white font-semibold">Персоны</h3>
-              <span className="text-2xl">👥</span>
-            </div>
-            <p className="text-3xl font-bold text-blue-400 mb-2">
-              {comparison.personComparison ? (
-                ((comparison.personComparison.actors.jaccardIndex + comparison.personComparison.directors.jaccardIndex) / 2 * 100).toFixed(0)
-              ) : (
-                (comparison.metrics.personOverlap * 100).toFixed(0)
-              )}%
-            </p>
-            <p className="text-sm text-gray-400">
-              Пересечение любимых актеров и режиссеров
-            </p>
-            <div className="mt-4 w-full bg-gray-800 rounded-full h-2 overflow-hidden">
-              <div
-                className="bg-blue-500 h-full"
-                style={{ width: `${comparison.personComparison ? ((comparison.personComparison.actors.jaccardIndex + comparison.personComparison.directors.jaccardIndex) / 2 * 100) : (comparison.metrics.personOverlap * 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
+         </div>
 
         {/* Statistics */}
         <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 mb-8">
@@ -604,130 +543,12 @@ export default function ComparisonPage() {
                       </div>
                     );
                   })}
-
-                  {/* Legend */}
-                  <div className="mt-6 p-3 bg-gray-800 rounded border border-gray-700">
-                    <p className="text-xs text-gray-400 mb-2">💡 Легенда:</p>
-                    <div className="space-y-1 text-xs text-gray-500">
-                      <p>✅ <span className="text-green-400">0.0-0.3</span> = Максимальное совпадение</p>
-                      <p>🟡 <span className="text-yellow-400">0.3-0.8</span> = Среднее совпадение</p>
-                      <p>🔴 <span className="text-red-400">0.8+</span> = Разные вкусы в жанре</p>
-                    </div>
-                  </div>
-
-                  {/* Summary */}
-                  <div className="pt-4 border-t border-gray-700">
-                    <p className="text-sm text-gray-400">
-                      📊 <span className="text-gray-300">Сходство жанров: <span className="font-bold text-blue-400">{comparison.metrics.genreRatingSimilarity ? (comparison.metrics.genreRatingSimilarity * 100).toFixed(0) : '—'}%</span></span>
-                    </p>
-                  </div>
                 </div>
               );
             })()}
           </div>
         )}
-
-        {/* Person Profiles Comparison */}
-        {comparison.personComparison && (
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-6 mb-8">
-            <h2 className="text-xl font-bold text-white mb-6">👥 Профиль Персон (Актеры & Режиссеры)</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Actors Comparison */}
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                    🎬 Актеры
-                  </h3>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-blue-400">
-                      {(comparison.personComparison.actors.jaccardIndex * 100).toFixed(0)}%
-                    </div>
-                    <div className="text-xs text-gray-400">Совпадение</div>
-                  </div>
-                </div>
-                
-                <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden mb-4">
-                  <div
-                    className="bg-blue-500 h-full"
-                    style={{ width: `${comparison.personComparison.actors.jaccardIndex * 100}%` }}
-                  />
-                </div>
-
-                  {/* Mutual Actors Only */}
-                  {comparison.personComparison.actors.mutual.length > 0 ? (
-                    <div>
-                      <h4 className="text-sm font-semibold text-green-400 mb-2">
-                        ✅ Любимые оба ({comparison.personComparison.actors.mutual.length})
-                      </h4>
-                      <div className="space-y-1">
-                        {comparison.personComparison.actors.mutual.slice(0, 5).map((actor) => (
-                          <div key={actor.name} className="text-sm text-gray-300 bg-green-900/20 px-2 py-1 rounded">
-                            <span className="font-medium">{actor.name}</span>
-                            <span className="text-gray-500 ml-1 text-xs">
-                              (Вы: {actor.userScore.toFixed(0)}, Он: {actor.comparedScore.toFixed(0)})
-                            </span>
-                          </div>
-                        ))}
-                        {comparison.personComparison.actors.mutual.length > 5 && (
-                          <p className="text-xs text-gray-500">+ еще {comparison.personComparison.actors.mutual.length - 5}</p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">Нет совпадающих актеров</p>
-                  )}
-              </div>
-
-              {/* Directors Comparison */}
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                    🎥 Режиссеры
-                  </h3>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-pink-400">
-                      {(comparison.personComparison.directors.jaccardIndex * 100).toFixed(0)}%
-                    </div>
-                    <div className="text-xs text-gray-400">Совпадение</div>
-                  </div>
-                </div>
-                
-                <div className="w-full bg-gray-700 rounded-full h-2 overflow-hidden mb-4">
-                  <div
-                    className="bg-pink-500 h-full"
-                    style={{ width: `${comparison.personComparison.directors.jaccardIndex * 100}%` }}
-                  />
-                </div>
-
-                  {/* Mutual Directors Only */}
-                  {comparison.personComparison.directors.mutual.length > 0 ? (
-                    <div>
-                      <h4 className="text-sm font-semibold text-green-400 mb-2">
-                        ✅ Любимые оба ({comparison.personComparison.directors.mutual.length})
-                      </h4>
-                      <div className="space-y-1">
-                        {comparison.personComparison.directors.mutual.slice(0, 5).map((director) => (
-                          <div key={director.name} className="text-sm text-gray-300 bg-green-900/20 px-2 py-1 rounded">
-                            <span className="font-medium">{director.name}</span>
-                            <span className="text-gray-500 ml-1 text-xs">
-                              (Вы: {director.userScore.toFixed(0)}, Он: {director.comparedScore.toFixed(0)})
-                            </span>
-                          </div>
-                        ))}
-                        {comparison.personComparison.directors.mutual.length > 5 && (
-                          <p className="text-xs text-gray-500">+ еще {comparison.personComparison.directors.mutual.length - 5}</p>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">Нет совпадающих режиссеров</p>
-                  )}
-              </div>
-            </div>
-          </div>
-        )}
-        </div>
       </div>
-    );
+    </div>
+  );
 }

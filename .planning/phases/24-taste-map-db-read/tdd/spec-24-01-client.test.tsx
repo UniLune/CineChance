@@ -34,7 +34,7 @@ describe('TasteMapClient Props and Rendering', () => {
     expect(html).toBeTruthy();
   });
 
-  it('should render genre profile section', () => {
+  it('should not render genre profile section (removed in phase 25)', () => {
     const html = renderToStaticMarkup(
       <TasteMapClient
         tasteMap={createMockTasteMap({
@@ -44,8 +44,7 @@ describe('TasteMapClient Props and Rendering', () => {
       />
     );
 
-    expect(html).toContain('Профиль жанров');
-    expect(html).toContain('recharts');
+    expect(html).not.toContain('Профиль жанров');
   });
 
   it('should render without topActors/topDirectors props', () => {

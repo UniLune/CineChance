@@ -316,16 +316,18 @@ Plans:
 
 ### Phase 25: Simplify TasteMap — PLANNED
 
-**Goal:** Remove persons (actors/directors) from TasteMap UI and calculations, update similarity weights to 60% genres + 40% movies
+**Goal:** Simplify TasteMap page — remove persons, update similarity weights, remove chart visualizations
 **Depends on:** Phase 24
 
 **User Decisions:**
 - Remove persons from UI and calculations (keep DB schema intact)
 - Update weights: 40% movies + 60% genres (was 50/30/20)
+- Remove genre bar chart and rating pie chart from taste-map page (keep summary stats, metrics, behavior profile)
 
 Plans:
-- [ ] 25-01-PLAN.md — Update similarity weights and storage
-- [ ] 25-02-PLAN.md — Remove person UI from taste map pages
+- [x] 25-01-PLAN.md — Update similarity weights and storage
+- [x] 25-02-PLAN.md — Remove person UI from taste map pages
+- [ ] 25-03-PLAN.md — Remove chart visualizations (genres bar chart, rating pie chart)
 
 ---
 

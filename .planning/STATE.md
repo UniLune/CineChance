@@ -5,13 +5,13 @@
 See: .planning/PROJECT.md (updated 2026-02-17)
 
 **Core value:** Personal movie tracking with intelligent recommendations
-**Current focus:** Phase 25 (Simplify TasteMap) - Ready to execute
+**Current focus:** Phase 25 (Simplify TasteMap) - Remove chart visualizations
 
 ## Current Status
 
 - **Phase:** 25 (Simplify TasteMap)
-- **Current Plan:** Ready to execute
-- **Goal:** Remove persons from UI and calculations, update weights to 60% genres + 40% movies
+- **Current Plan:** 25-03 (remove chart visualizations)
+- **Goal:** Simplify TasteMap page — remove persons, update weights, remove chart visualizations
 
 ## Progress
 

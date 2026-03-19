@@ -48,6 +48,7 @@ export interface TypeProfile {
 export interface TasteMap {
   userId: string;
   genreProfile: GenreProfile;
+  genreCounts: Record<string, number>;
   ratingDistribution: RatingDistribution;
   averageRating: number;    // 0-10 scale
   personProfiles: PersonProfiles;

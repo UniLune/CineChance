@@ -20,11 +20,11 @@
   },
   "agent": {
     "gsd-tdd-orchestrator": {
-      "model": "openrouter/openrouter/hunter-alpha",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
       "prompt": "{file:.opencode/agents/gsd-tdd-orchestrator.md}"
     },
     "gsd-phase-researcher": {
-      "model": "openrouter/openrouter/hunter-alpha",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
       "prompt": "{file:.opencode/agents/gsd-phase-researcher.md}",
       "tools": {
         "write": true,
@@ -36,7 +36,7 @@
       }
     },
     "gsd-tdd-acceptance-spec": {
-      "model": "openrouter/openrouter/hunter-alpha",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
       "prompt": "{file:.opencode/agents/gsd-tdd-acceptance-spec.md}",
       "tools": {
         "write": true,
@@ -48,7 +48,7 @@
       }
     },
     "gsd-tdd-acceptance-code": {
-      "model": "opencode/mimo-v2-flash-free",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
       "prompt": "{file:.opencode/agents/gsd-tdd-acceptance-code.md}",
       "tools": {
         "write": true,
@@ -60,7 +60,7 @@
       }
     },
     "gsd-tdd-spec": {
-      "model": "openrouter/openrouter/hunter-alpha",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
       "prompt": "{file:.opencode/agents/gsd-tdd-spec.md}",
       "tools": {
         "write": true,
@@ -96,7 +96,7 @@
       }
     },
     "gsd-tdd-refactor": {
-      "model": "openrouter/mimo-v2-flash-free",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
       "prompt": "{file:.opencode/agents/gsd-tdd-refactor.md}",
       "tools": {
         "write": false,
@@ -108,7 +108,7 @@
       }
     },
     "gsd-tdd-docs": {
-      "model": "opencode/nemotron-3-super-free",
+      "model": "opencode/big-pickle",
       "prompt": "{file:.opencode/agents/gsd-tdd-docs.md}",
       "tools": {
         "write": true,
@@ -132,7 +132,7 @@
       }
     },
     "gsd-intent-verifier": {
-      "model": "openrouter/openrouter/hunter-alpha",
+      "model": "zai/glm-4.7-flash",
       "prompt": "{file:.opencode/agents/gsd-intent-verifier.md}",
       "tools": {
         "write": true,
@@ -174,7 +174,7 @@
       "temperature": 0.3
     },
     "plan": {
-      "model": "openrouter/openrouter/hunter-alpha",
+      "model": "openrouter/stepfun/step-3.5-flash:free",
       "temperature": 0.1,
       "tools": {
         "write": false,

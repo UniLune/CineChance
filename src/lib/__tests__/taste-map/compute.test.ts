@@ -279,14 +279,19 @@ describe('computeMetrics', () => {
     expect(result.consistency).toBe(30);
   });
 
-  it('computes diversity based on genres with weight > 20', () => {
+  it('computes diversity as percentage of unique genres', () => {
     const genreProfile = { Action: 50, Drama: 10, Comedy: 30, Thriller: 5 };
     const result = computeMetrics(genreProfile, { high: 0, medium: 100, low: 0 });
-    expect(result.diversity).toBe(10);
+    expect(result.diversity).toBe(21);
   });
 
-  it('caps diversity at 100 even with many genres', () => {
-    const genreProfile = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`Genre${i}`, 30]));
+  it('caps diversity at 100 when all 19 genres present', () => {
+    const genreProfile = {
+      Action: 50, Adventure: 50, Animation: 50, Comedy: 50, Crime: 50,
+      Documentary: 50, Drama: 50, Family: 50, Fantasy: 50, History: 50,
+      Horror: 50, Music: 50, Mystery: 50, Romance: 50, 'Science Fiction': 50,
+      'TV Movie': 50, Thriller: 50, War: 50, Western: 50,
+    };
     const result = computeMetrics(genreProfile, { high: 0, medium: 100, low: 0 });
     expect(result.diversity).toBe(100);
   });

@@ -27,6 +27,9 @@ import {
 // Completed status IDs from MovieStatus table
 const COMPLETED_STATUS_IDS = [MOVIE_STATUS_IDS.WATCHED, MOVIE_STATUS_IDS.REWATCHED];
 
+// TMDB has 19 movie genres
+const TMDB_GENRE_COUNT = 19 as const;
+
 /**
  * Compute genre profile from watched movies
  * Aggregates ratings by genre, returns 0-100 scale
@@ -270,10 +273,9 @@ export function computeMetrics(
   // High medium % = high consistency
   const consistency = ratingDistribution.medium;
 
-  // Diversity: number of genres with significant presence (>20)
-  const genreCount = Object.values(genreProfile).filter(v => v > 20).length;
-  // Scale to 0-100 (cap at 20 genres for 100%)
-  const diversity = Math.min(100, genreCount * 5);
+  // Diversity: percentage of unique genres out of 19 TMDB genres
+  const genreCount = Object.keys(genreProfile).length;
+  const diversity = Math.round((genreCount / TMDB_GENRE_COUNT) * 100);
 
   return { positiveIntensity, negativeIntensity, consistency, diversity };
 }

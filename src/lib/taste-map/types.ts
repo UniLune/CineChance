@@ -48,6 +48,8 @@ export interface TypeProfile {
 export interface TasteMap {
   userId: string;
   genreProfile: GenreProfile;
+  /** Movie count per genre (e.g., { "Action": 15, "Drama": 12 }) */
+  genreCounts: Record<string, number>;
   ratingDistribution: RatingDistribution;
   averageRating: number;    // 0-10 scale
   personProfiles: PersonProfiles;

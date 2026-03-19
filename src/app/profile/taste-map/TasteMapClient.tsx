@@ -3,6 +3,14 @@
 import type { TasteMap } from '@/lib/taste-map/types';
 import TwinTasters from './TwinTasters';
 
+/** TMDB movie genre names in alphabetical order */
+const TMDB_GENRES = [
+  'Action', 'Adventure', 'Animation', 'Comedy', 'Crime',
+  'Documentary', 'Drama', 'Family', 'Fantasy', 'History',
+  'Horror', 'Music', 'Mystery', 'Romance', 'Science Fiction',
+  'TV Movie', 'Thriller', 'War', 'Western'
+] as const;
+
 /** Props for TasteMapClient component */
 interface TasteMapClientProps {
   /** Taste map data from server (null when loading or no data) */
@@ -27,8 +35,10 @@ interface TasteMapClientProps {
  * @returns Taste map profile UI or empty state
  */
 export default function TasteMapClient({ tasteMap, userId }: TasteMapClientProps) {
-  // Empty state
-  if (!tasteMap || Object.keys(tasteMap.genreProfile).length === 0) {
+  // Empty state - show empty when genreCounts is empty or all zeros
+  const genreCountsEmpty = !tasteMap?.genreCounts || Object.keys(tasteMap.genreCounts).length === 0;
+  const allCountsZero = tasteMap?.genreCounts && Object.values(tasteMap.genreCounts).every(c => c === 0);
+  if (!tasteMap || genreCountsEmpty || allCountsZero) {
     return (
       <div className="bg-gray-900 rounded-lg p-8 text-center">
         <div className="text-6xl mb-4">🎬</div>
@@ -127,6 +137,31 @@ export default function TasteMapClient({ tasteMap, userId }: TasteMapClientProps
               Процент просмотренного контента из всех добавленных
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Ваши жанры */}
+      <div className="bg-gray-900 rounded-lg p-6">
+        <h2 className="text-xl font-semibold text-white mb-4">Ваши жанры</h2>
+        <div className="space-y-3">
+          {TMDB_GENRES.map(genre => {
+            const count = tasteMap.genreCounts[genre] ?? 0;
+            const avg = tasteMap.genreProfile[genre] || 0;
+            const maxCount = Math.max(...Object.values(tasteMap.genreCounts), 1);
+            const barWidth = (count / maxCount) * 100;
+            const hasRating = avg > 0;
+            // Always show count for all genres
+            const countDisplay = `(${count})`;
+            const avgDisplay = hasRating ? avg.toFixed(1) : '—';
+            return (
+              <div key={genre} className="flex items-center text-sm">
+                <div className="w-40 md:w-48 text-gray-300 truncate">{genre} {countDisplay} {avgDisplay}</div>
+                <div className="flex-1 mx-2 bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                  <div className="bg-purple-500 h-full rounded-full" style={{ width: `${barWidth}%` }} />
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

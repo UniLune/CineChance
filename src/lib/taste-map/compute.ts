@@ -31,6 +31,29 @@ const COMPLETED_STATUS_IDS = [MOVIE_STATUS_IDS.WATCHED, MOVIE_STATUS_IDS.REWATCH
 const TMDB_GENRE_COUNT = 19 as const;
 
 /**
+ * Compute genre counts from watched movies
+ * Counts how many times each genre appears across all watched movies
+ * Each movie contributes once per genre (deduplicates within the same movie)
+ * @param watchedMovies - Array of watched movies with genres
+ * @returns Record mapping genre names to occurrence counts
+ */
+export function computeGenreCounts(watchedMovies: WatchListItemFull[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const movie of watchedMovies) {
+    const genres = movie.genres || [];
+    // Deduplicate genres within the same movie
+    const uniqueGenres = new Set<string>();
+    for (const genre of genres) {
+      uniqueGenres.add(genre.name);
+    }
+    for (const name of uniqueGenres) {
+      counts[name] = (counts[name] || 0) + 1;
+    }
+  }
+  return counts;
+}
+
+/**
  * Compute genre profile from watched movies
  * Aggregates ratings by genre, returns 0-100 scale
  */
@@ -365,6 +388,7 @@ export async function computeTasteMap(userId: string): Promise<TasteMap> {
     return {
       userId,
       genreProfile: {},
+      genreCounts: {},
       ratingDistribution: { high: 0, medium: 0, low: 0 },
       averageRating: 0,
       personProfiles: { actors: {}, directors: {} },
@@ -383,6 +407,7 @@ export async function computeTasteMap(userId: string): Promise<TasteMap> {
 
   // Compute profiles
   const genreProfile = computeGenreProfile(watchListItems);
+  const genreCounts = computeGenreCounts(watchListItems);
   const personProfiles = computePersonProfile(watchListItems);
   const typeProfile = computeTypeProfile(watchListItems);
   const ratingDistribution = computeRatingDistribution(watchListItems);
@@ -393,6 +418,7 @@ export async function computeTasteMap(userId: string): Promise<TasteMap> {
   const tasteMap: TasteMap = {
     userId,
     genreProfile,
+    genreCounts,
     ratingDistribution,
     averageRating,
     personProfiles,

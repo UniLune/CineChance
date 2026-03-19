@@ -44,6 +44,7 @@ import {
   computeRatingDistribution,
   computeAverageRating,
   computeMetrics,
+  computeGenreCounts,
 } from '@/lib/taste-map/compute';
 import type { WatchListItemFull } from '@/lib/taste-map/types';
 
@@ -117,6 +118,54 @@ describe('computeGenreProfile', () => {
   it('handles movie with no genres', () => {
     const movies = [createMovie({ userRating: 8, genres: [] })];
     expect(computeGenreProfile(movies)).toEqual({});
+  });
+});
+
+describe('computeGenreCounts', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('handles empty array', () => {
+    expect(computeGenreCounts([])).toEqual({});
+  });
+
+  it('counts single movie with one genre', () => {
+    const movies = [createMovie({ genres: [{ id: 28, name: 'Action' }] })];
+    expect(computeGenreCounts(movies)).toEqual({ Action: 1 });
+  });
+
+  it('counts single movie with multiple genres', () => {
+    const movies = [createMovie({
+      genres: [{ id: 28, name: 'Action' }, { id: 12, name: 'Adventure' }],
+    })];
+    const result = computeGenreCounts(movies);
+    expect(result.Action).toBe(1);
+    expect(result.Adventure).toBe(1);
+  });
+
+  it('sums counts for multiple movies with overlapping genres', () => {
+    const movies = [
+      createMovie({ genres: [{ id: 28, name: 'Action' }] }),
+      createMovie({ genres: [{ id: 28, name: 'Action' }, { id: 18, name: 'Drama' }] }),
+    ];
+    const result = computeGenreCounts(movies);
+    expect(result.Action).toBe(2);
+    expect(result.Drama).toBe(1);
+  });
+
+  it('handles movies with no genres gracefully', () => {
+    const movies = [
+      createMovie({ genres: [] }),
+      createMovie({ genres: [{ id: 28, name: 'Action' }] }),
+    ];
+    expect(computeGenreCounts(movies)).toEqual({ Action: 1 });
+  });
+
+  it('counts each movie once per genre', () => {
+    const movies = [
+      createMovie({ genres: [{ id: 28, name: 'Action' }, { id: 28, name: 'Action' }] }),
+    ];
+    // A movie with duplicate genre entries should count once
+    expect(computeGenreCounts(movies)).toEqual({ Action: 1 });
   });
 });
 
@@ -352,6 +401,7 @@ describe('Async Functions', () => {
       const result = await computeTasteMap('user123');
       expect(result.userId).toBe('user123');
       expect(result.genreProfile).toEqual({});
+      expect(result.genreCounts).toEqual({});
       expect(result.ratingDistribution).toEqual({ high: 0, medium: 0, low: 0 });
       expect(result.averageRating).toBe(0);
     });
@@ -380,6 +430,8 @@ describe('Async Functions', () => {
 
       expect(result.genreProfile['Action']).toBe(90);
       expect(result.genreProfile['Drama']).toBe(70);
+      expect(result.genreCounts['Action']).toBe(1);
+      expect(result.genreCounts['Drama']).toBe(1);
       // Actor A appears in both movies: (9+7)/2 = 8 -> 80
       expect(result.personProfiles.actors['Actor A']).toBe(80);
       // Director X appears in both movies due to mock returning same crew for both, average (9+7)/2=8 -> 80

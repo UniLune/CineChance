@@ -343,4 +343,16 @@ Plans:
 
 ---
 
+### Phase 27: Genre Stats Display — PLANNED
+
+**Goal:** Add "Ваши жанры" block to TasteMap page showing horizontal bars for each TMDB genre with movie count and average rating.
+**Depends on:** Phase 26
+
+**Requirements:** [UI-02]
+
+Plans:
+- [ ] 27-01-PLAN.md — Add genreCounts computation and UI display
+
+---
+
 _For current project status, see .planning/PROJECT.md_

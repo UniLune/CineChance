@@ -1,0 +1,53 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { getSimilarityScoresWithFreshness } from '../similarity-storage';
+import { prisma } from '@/lib/prisma';
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    similarityScore: {
+      findMany: vi.fn(),
+    },
+  },
+}));
+
+describe('getSimilarityScoresWithFreshness', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns scores with isFresh flag', async () => {
+    const now = new Date();
+    const fresh = { userIdA: 'a', userIdB: 'b', overallMatch: '0.5000', expiresAt: new Date(now.getTime() + 1000 * 60 * 60 * 24) } as any;
+    const stale = { userIdA: 'c', userIdB: 'd', overallMatch: '0.3000', expiresAt: new Date(now.getTime() - 1000 * 60 * 60 * 24) } as any;
+    vi.mocked(prisma.similarityScore.findMany).mockResolvedValue([fresh, stale]);
+
+    const result = await getSimilarityScoresWithFreshness('user-1', 10);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].isFresh).toBe(true);
+    expect(result[1].isFresh).toBe(false);
+    expect(result[0].score).toBe(fresh);
+    expect(result[1].score).toBe(stale);
+  });
+
+  it('marks records without expiresAt as fresh', async () => {
+    const noExpiry = { userIdA: 'a', userIdB: 'b', overallMatch: '0.5000' } as any;
+    vi.mocked(prisma.similarityScore.findMany).mockResolvedValue([noExpiry]);
+
+    const result = await getSimilarityScoresWithFreshness('user-1', 10);
+
+    expect(result[0].isFresh).toBe(true);
+  });
+
+  it('orders by overallMatch descending', async () => {
+    const now = new Date();
+    const score1 = { userIdA: 'a', userIdB: 'b', overallMatch: '0.3000', expiresAt: new Date(now.getTime() + 1000 * 60 * 60 * 24) } as any;
+    const score2 = { userIdA: 'c', userIdB: 'd', overallMatch: '0.8000', expiresAt: new Date(now.getTime() + 1000 * 60 * 60 * 24) } as any;
+    vi.mocked(prisma.similarityScore.findMany).mockResolvedValue([score1, score2]);
+
+    const result = await getSimilarityScoresWithFreshness('user-1', 10);
+
+    expect(result[0].score.overallMatch).toBe('0.8000');
+    expect(result[1].score.overallMatch).toBe('0.3000');
+  });
+});

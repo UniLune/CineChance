@@ -10,8 +10,10 @@ import { computeSimilarity } from './similarity';
 import { getTasteMap, computeTasteMap } from './index';
 import { MOVIE_STATUS_IDS } from '@/lib/movieStatusConstants';
 import type { TasteMap } from './types';
+import { invalidateCache } from '@/lib/redis';
 
 const COMPLETED_STATUS_IDS = [MOVIE_STATUS_IDS.WATCHED, MOVIE_STATUS_IDS.REWATCHED];
+export const SIMILARITY_TTL_HOURS = 168; // 7 days
 
 /**
  * Compute and store similarity score between two users
@@ -30,6 +32,9 @@ export async function computeAndStoreSimilarityScore(
   try {
     // Ensure consistent ordering (userIdA < userIdB)
     const [orderedA, orderedB] = userIdA < userIdB ? [userIdA, userIdB] : [userIdB, userIdA];
+
+    // Calculate expiration timestamp (TTL: 7 days)
+    const expiresAt = new Date(Date.now() + SIMILARITY_TTL_HOURS * 60 * 60 * 1000);
 
     // Load taste maps with caching
     const [tasteMapA, tasteMapB] = await Promise.all([
@@ -66,6 +71,7 @@ export async function computeAndStoreSimilarityScore(
         computedAt: new Date(),
         updatedAt: new Date(),
         computedBy,
+        expiresAt,
       },
       create: {
         userIdA: orderedA,
@@ -78,6 +84,7 @@ export async function computeAndStoreSimilarityScore(
         tasteMapBSnapshot,
         computedAt: new Date(),
         computedBy,
+        expiresAt,
       },
     });
 
@@ -255,6 +262,38 @@ export function generateTasteMapSnapshot(tasteMap: TasteMap): object {
 }
 
 /**
+ * Get similarity scores with freshness flag
+ * Used by staleness-aware API endpoints
+ * Returns scores sorted by overallMatch descending
+ */
+export async function getSimilarityScoresWithFreshness(
+  userId: string,
+  limit: number = 50
+): Promise<Array<{ score: any; isFresh: boolean }>> {
+  const now = new Date();
+  
+  const scores = await prisma.similarityScore.findMany({
+    where: {
+      OR: [
+        { userIdA: userId },
+        { userIdB: userId },
+      ],
+    },
+    take: limit,
+  });
+  
+  const result = scores.map(score => ({
+    score,
+    isFresh: !score.expiresAt || score.expiresAt > now,
+  }));
+  
+  // Sort by overallMatch descending (numeric comparison)
+  result.sort((a, b) => Number(b.score.overallMatch) - Number(a.score.overallMatch));
+  
+  return result;
+}
+
+/**
  * Delete old similarity scores (older than maxAgeDays)
  * Used by cleanup job to manage database size
  */
@@ -342,6 +381,32 @@ export async function cleanupOrphanedScores(): Promise<{
     orphans: orphanedIds,
   };
 }
+
+/**
+ * Delete all SimilarityScore entries for a given user.
+ * Called when user changes their ratings to invalidate stale scores.
+ */
+export async function deleteSimilarityScoresByUser(userId: string): Promise<number> {
+  const result = await prisma.similarityScore.deleteMany({
+    where: {
+      OR: [
+        { userIdA: userId },
+        { userIdB: userId },
+      ],
+    },
+  });
+
+  // Invalidate Redis cache to prevent serving stale data during race condition window
+  await invalidateCache(`similar-users:v2:${userId}`);
+
+  logger.info('Deleted similarity scores for user', {
+    userId,
+    deleted: result.count,
+    context: 'SimilarityStorage',
+  });
+
+  return result.count;
+}
 /**
  * Get completed watch count for multiple users in a single query.
  * Uses groupBy to avoid N+1. Returns Map where missing users are not included (caller should use ?? 0).
@@ -360,8 +425,10 @@ export async function getUserCompletedWatchCount(
 
   const countMap = new Map<string, number>();
   for (const item of results) {
-    // Support both test mock shape (count) and real Prisma shape (_count)
-    const count = (item as any).count ?? (item as any)._count;
+    const itemUnknown = item as unknown;
+    const count = ('count' in itemUnknown)
+      ? (itemUnknown as { count: number }).count
+      : (itemUnknown as { _count: { _all: number } })._count._all;
     countMap.set(item.userId, count);
   }
   return countMap;

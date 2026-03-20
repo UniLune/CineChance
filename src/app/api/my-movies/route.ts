@@ -10,6 +10,8 @@ import { MOVIE_STATUS_IDS, getStatusIdByName, getStatusNameById } from '@/lib/mo
 import { calculateCineChanceScore } from '@/lib/calculateCineChanceScore';
 import { logger } from '@/lib/logger';
 import { trackOutcome } from '@/lib/recommendation-outcome-tracking';
+import { invalidateTasteMap } from '@/lib/taste-map/redis';
+import { deleteSimilarityScoresByUser } from '@/lib/taste-map/similarity-storage';
 import type { TMDbMovie, TMDbTV } from '@/lib/types/tmdb';
 
 const ITEMS_PER_PAGE = 20;

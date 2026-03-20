@@ -54,7 +54,7 @@ export async function computeAllSimilarityScores(
     });
 
     // Get active users
-    const activeUsers = await getActiveUsersForSimilarityCompute(30, 30, 1000);
+    const activeUsers = await getActiveUsersForSimilarityCompute(3, 30, 1000);
 
     if (activeUsers.length === 0) {
       logger.warn('No active users found for similarity computation', {
@@ -94,7 +94,7 @@ export async function computeAllSimilarityScores(
 
       try {
         // Get candidate users for this user
-        const candidates = await getCandidateUsersForSimilarity(userA, 20);
+         const candidates = await getCandidateUsersForSimilarity(userA, 100);
 
         // Compute similarity for each candidate
         for (const userB of candidates) {

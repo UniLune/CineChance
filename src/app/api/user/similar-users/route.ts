@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { rateLimit } from '@/middleware/rateLimit';
 import { computeAndStoreSimilarityScore, getCandidateUsersForSimilarity } from '@/lib/taste-map/similarity-storage';
-import { computeSimilarity, isSimilar, MIN_MATCH_THRESHOLD } from '@/lib/taste-map/similarity';
+import { computeSimilarity, isSimilar, MIN_MATCH_THRESHOLD, getSimilarUsers, storeSimilarUsers } from '@/lib/taste-map/similarity';
 import { getUserCompletedWatchCount } from '@/lib/taste-map/similarity-storage';
 
 /**
@@ -63,7 +63,6 @@ export async function GET(request: NextRequest) {
 
     const userId = session.user.id;
     const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100); // Increased default and max limits
-    const freshOnly = searchParams.get('freshOnly') === 'true';
 
     // Check user has minimum history
     const watchListCount = await prisma.watchList.count({
@@ -79,7 +78,47 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get similar users from database
+    // Try Redis cache first (fast path)
+    const cachedTwins = await getSimilarUsers(userId);
+
+    if (cachedTwins.length > 0) {
+      logger.debug('Returning similar users from Redis cache', {
+        userId,
+        count: cachedTwins.length,
+        context: 'SimilarUsersAPI',
+      });
+
+      // Enrich cached results: need userInfo and completedCounts
+      const cachedUserIds = cachedTwins.map(t => t.userId);
+      const [userInfoMap, completedCountsMap] = await Promise.all([
+        prisma.user.findMany({
+          where: { id: { in: cachedUserIds } },
+          select: { id: true, createdAt: true },
+        }),
+        getUserCompletedWatchCount(cachedUserIds),
+      ]);
+
+      const userInfoById = new Map(userInfoMap.map(u => [u.id, u] as [string, { id: string; createdAt: Date }]));
+
+      const enrichedResults = cachedTwins
+        .filter(u => u.overallMatch >= MIN_MATCH_THRESHOLD && (completedCountsMap.get(u.userId) ?? 0) >= MIN_COMPLETED_WATCH_COUNT)
+        .map(u => ({
+          userId: u.userId,
+          overallMatch: Number((u.overallMatch * 100).toFixed(1)),
+          watchCount: completedCountsMap.get(u.userId) ?? 0,
+          memberSince: userInfoById.get(u.userId)?.createdAt,
+          source: 'cache' as const,
+        }));
+
+      return NextResponse.json({
+        similarUsers: enrichedResults,
+        fromDatabase: false,
+        computedAt: new Date().toISOString(),
+        message: `Found ${enrichedResults.length} similar user(s) from cache`,
+      });
+    }
+
+    // Get all similarity scores from database (no freshOnly)
     let dbScores = await prisma.similarityScore.findMany({
       where: {
         OR: [
@@ -90,23 +129,22 @@ export async function GET(request: NextRequest) {
       orderBy: {
         overallMatch: 'desc',
       },
-      take: limit,
+      // Fetch extra to allow for stale filtering
+      take: limit * 2,
     });
 
     let fromDatabase = true;
     let computedAt = new Date();
 
-    // FALLBACK: If no data in database, compute on-the-fly and save
-    // This handles the migration from Redis cache to persistent storage
     if (dbScores.length === 0) {
-      logger.info('No cached similarities found, computing on-the-fly', {
+      // FULL ON-DEMAND FALLBACK
+      logger.info('No similarity scores found, computing on-demand', {
         userId,
         context: 'SimilarUsersAPI',
       });
 
       fromDatabase = false;
 
-      // Find candidate users with shared movies - checks ALL users, not limited to sample
       const candidateIds = await getCandidateUsersForSimilarity(userId);
 
       if (candidateIds.length === 0) {
@@ -124,7 +162,6 @@ export async function GET(request: NextRequest) {
         context: 'SimilarUsersAPI',
       });
 
-      // Compute similarities and store in DB
       const computedScores: typeof dbScores = [];
       let similarCount = 0;
       for (const candidateId of candidateIds) {
@@ -133,13 +170,13 @@ export async function GET(request: NextRequest) {
 
           if (isSimilar(result)) {
             similarCount++;
-            // Store to database
             await computeAndStoreSimilarityScore(userId, candidateId, 'on-demand');
 
-            // Also fetch the stored record for consistent response
             const stored = await prisma.similarityScore.findUnique({
               where: {
-                userIdA_userIdB: userId < candidateId ? { userIdA: userId, userIdB: candidateId } : { userIdA: candidateId, userIdB: userId },
+                userIdA_userIdB: userId < candidateId
+                  ? { userIdA: userId, userIdB: candidateId }
+                  : { userIdA: candidateId, userIdB: userId },
               },
             });
 
@@ -149,8 +186,8 @@ export async function GET(request: NextRequest) {
           }
         } catch (err) {
           logger.debug('Error computing similarity', {
-            error: err instanceof Error ? err.message : String(err),
             candidateId,
+            error: err instanceof Error ? err.message : String(err),
             context: 'SimilarUsersAPI',
           });
         }
@@ -163,10 +200,87 @@ export async function GET(request: NextRequest) {
         context: 'SimilarUsersAPI',
       });
 
-      // Sort by match score
       computedScores.sort((a, b) => Number(b.overallMatch) - Number(a.overallMatch));
       dbScores = computedScores.slice(0, limit);
       computedAt = new Date();
+
+      // Store to Redis after on-demand computation
+      const redisScores = dbScores.map(s => ({
+        userId: s.userIdA === userId ? s.userIdB : s.userIdA,
+        overallMatch: Number(s.overallMatch) / 100,
+      }));
+      await storeSimilarUsers(userId, redisScores);
+    } else {
+      // HAS SCORES: Check freshness and lazy recompute stale pairs
+      const now = new Date();
+      const freshScores: typeof dbScores = [];
+      const stalePairs: Array<{ score: typeof dbScores[0]; otherUserId: string }> = [];
+
+      // Extend type to include expiresAt (added via migration)
+      type SimilarityScoreWithExpires = typeof dbScores[number] & { expiresAt?: Date | null };
+
+      for (const score of dbScores) {
+        const scoreWithExpires = score as SimilarityScoreWithExpires;
+        const isFresh = !scoreWithExpires.expiresAt || scoreWithExpires.expiresAt > now;
+        if (isFresh) {
+          freshScores.push(score);
+        } else {
+          const otherUserId = score.userIdA === userId ? score.userIdB : score.userIdA;
+          stalePairs.push({ score, otherUserId });
+        }
+      }
+
+      // Lazy recompute stale pairs
+      for (const { score, otherUserId } of stalePairs) {
+        try {
+          logger.debug('Recomputing stale similarity pair', {
+            userId,
+            otherUserId,
+            oldScore: Number(score.overallMatch),
+            context: 'SimilarUsersAPI',
+          });
+
+          const result = await computeSimilarity(userId, otherUserId, false);
+
+          if (isSimilar(result)) {
+            await computeAndStoreSimilarityScore(userId, otherUserId, 'on-demand');
+
+            const refreshed = await prisma.similarityScore.findUnique({
+              where: {
+                userIdA_userIdB: score.userIdA < score.userIdB
+                  ? { userIdA: score.userIdA, userIdB: score.userIdB }
+                  : { userIdA: score.userIdB, userIdB: score.userIdA },
+              },
+            });
+
+            if (refreshed) {
+              freshScores.push(refreshed);
+            }
+          }
+          // If not similar, old score is omitted (will expire naturally)
+        } catch (err) {
+          logger.debug('Error recomputing similarity pair', {
+            userId,
+            otherUserId,
+            error: err instanceof Error ? err.message : String(err),
+            context: 'SimilarUsersAPI',
+          });
+          // Keep old score on error (it's stale but maybe better than nothing)
+          freshScores.push(score);
+        }
+      }
+
+      // Sort and limit
+      freshScores.sort((a, b) => Number(b.overallMatch) - Number(a.overallMatch));
+      dbScores = freshScores.slice(0, limit);
+      computedAt = new Date();
+
+      // Store updated results to Redis
+      const redisScores = dbScores.map(s => ({
+        userId: s.userIdA === userId ? s.userIdB : s.userIdA,
+        overallMatch: Number(s.overallMatch) / 100,
+      }));
+      await storeSimilarUsers(userId, redisScores);
     }
 
     // Extract user IDs and scores (convert Decimal to number)
@@ -177,22 +291,6 @@ export async function GET(request: NextRequest) {
       computedAt: score.computedAt,
     }));
 
-    if (freshOnly && similarUsers.length > 0) {
-      // Filter to only fresh scores (computed within last 7 days)
-      const freshScores = similarUsers.filter(u => {
-        const ageHours = (Date.now() - u.computedAt.getTime()) / (1000 * 60 * 60);
-        return ageHours <= 168; // 7 days
-      });
-      
-      if (freshScores.length === 0) {
-        return NextResponse.json({
-          similarUsers: [],
-          fromDatabase: false,
-          computedAt: new Date().toISOString(),
-          message: 'No fresh similarity scores found. Scheduler runs weekly.',
-        });
-      }
-    }
 
     // Fetch user info for enrichment
     const userIds = similarUsers.map(u => u.userId);

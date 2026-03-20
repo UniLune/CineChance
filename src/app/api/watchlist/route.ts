@@ -10,6 +10,8 @@ import { rateLimit } from "@/middleware/rateLimit";
 import { calculateWeightedRating } from "@/lib/calculateWeightedRating";
 import { invalidateUserCache } from "@/lib/redis";
 import { recomputeTasteMap } from '@/lib/taste-map/compute';
+import { invalidateTasteMap } from '@/lib/taste-map/redis';
+import { deleteSimilarityScoresByUser } from '@/lib/taste-map/similarity-storage';
 import { trackOutcome } from '@/lib/recommendation-outcome-tracking';
 import { incrementallyUpdatePersonProfile, ensureMoviePersonCacheExists } from '@/lib/taste-map/person-profile-v2';
 import { randomUUID } from 'crypto';
@@ -220,24 +222,27 @@ export async function POST(req: Request) {
             ratingChange: newRating - (previousRating || 0),
           },
         });
-      }
+       }
 
-      // Trigger background taste map recomputation
-      after(async () => {
-        try {
-          await recomputeTasteMap(session.user.id);
-        } catch (error) {
-          logger.error('Taste map recompute failed', {
-            error: error instanceof Error ? error.message : String(error),
-            userId: session.user.id,
-          });
-        }
-      });
+       // Trigger background taste map recomputation and similarity invalidation
+       after(async () => {
+         try {
+           await recomputeTasteMap(session.user.id);
+           await invalidateTasteMap(session.user.id);
+           await deleteSimilarityScoresByUser(session.user.id);
+         } catch (error) {
+           logger.error('Background invalidation failed', {
+             error: error instanceof Error ? error.message : String(error),
+             userId: session.user.id,
+             context: 'WatchlistPOST',
+           });
+         }
+       });
 
-      return NextResponse.json({ success: true });
-    }
+       return NextResponse.json({ success: true });
+     }
 
-    // Логика пересмотра - обновляем только оценку и счётчик просмотров, НЕ меняем статус
+     // Логика пересмотра - обновляем только оценку и счётчик просмотров, НЕ меняем статус
     if (isRewatch) {
       if (!tmdbId || !mediaType || !title) {
         return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -343,24 +348,27 @@ export async function POST(req: Request) {
             ratingChange: newRating - (previousRating || 0),
           },
         });
-      }
+       }
 
-      // Trigger background taste map recomputation
-      after(async () => {
-        try {
-          await recomputeTasteMap(session.user.id);
-        } catch (error) {
-          logger.error('Taste map recompute failed', {
-            error: error instanceof Error ? error.message : String(error),
-            userId: session.user.id,
-          });
-        }
-      });
+       // Trigger background taste map recomputation and similarity invalidation
+       after(async () => {
+         try {
+           await recomputeTasteMap(session.user.id);
+           await invalidateTasteMap(session.user.id);
+           await deleteSimilarityScoresByUser(session.user.id);
+         } catch (error) {
+           logger.error('Background invalidation failed', {
+             error: error instanceof Error ? error.message : String(error),
+             userId: session.user.id,
+             context: 'WatchlistPOST',
+           });
+         }
+       });
 
-      return NextResponse.json({ success: true });
-    }
+       return NextResponse.json({ success: true });
+     }
 
-    // Обычная логика добавления/изменения статуса
+     // Обычная логика добавления/изменения статуса
     if (!tmdbId || !mediaType || !status || !title) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
@@ -533,23 +541,26 @@ export async function POST(req: Request) {
           userId: session.user.id,
         });
       }
-    }
+     }
 
-    // Trigger background taste map recomputation
-    after(async () => {
-      try {
-        await recomputeTasteMap(session.user.id);
-      } catch (error) {
-        logger.error('Taste map recompute failed', {
-          error: error instanceof Error ? error.message : String(error),
-          userId: session.user.id,
-        });
-      }
-    });
+     // Trigger background taste map recomputation and similarity invalidation
+     after(async () => {
+       try {
+         await recomputeTasteMap(session.user.id);
+         await invalidateTasteMap(session.user.id);
+         await deleteSimilarityScoresByUser(session.user.id);
+       } catch (error) {
+         logger.error('Background invalidation failed', {
+           error: error instanceof Error ? error.message : String(error),
+           userId: session.user.id,
+           context: 'WatchlistPOST',
+         });
+       }
+     });
 
-    logger.info(formatWatchlistLog(requestId, endpoint, session.user.id, 'success', tmdbId, `status: ${status}`));
-    return NextResponse.json({ success: true, record });
-  } catch (error) {
+     logger.info(formatWatchlistLog(requestId, endpoint, session.user.id, 'success', tmdbId, `status: ${status}`));
+     return NextResponse.json({ success: true, record });
+   } catch (error) {
     logger.error(formatWatchlistLog(requestId, endpoint, '-', 'error', undefined, `Error: ${error instanceof Error ? error.message : String(error)}`));
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
@@ -591,21 +602,24 @@ export async function DELETE(req: Request) {
       },
     });
 
-    await invalidateUserCache(session.user.id);
+     await invalidateUserCache(session.user.id);
 
-    // Trigger background taste map recomputation
-    after(async () => {
-      try {
-        await recomputeTasteMap(session.user.id);
-      } catch (error) {
-        logger.error('Taste map recompute failed', {
-          error: error instanceof Error ? error.message : String(error),
-          userId: session.user.id,
-        });
-      }
-    });
+     // Trigger background taste map recomputation and similarity invalidation
+     after(async () => {
+       try {
+         await recomputeTasteMap(session.user.id);
+         await invalidateTasteMap(session.user.id);
+         await deleteSimilarityScoresByUser(session.user.id);
+       } catch (error) {
+         logger.error('Background invalidation failed', {
+           error: error instanceof Error ? error.message : String(error),
+           userId: session.user.id,
+           context: 'WatchlistDELETE',
+         });
+       }
+     });
 
-    logger.info(formatWatchlistLog(requestId, endpoint, session.user.id, 'deleted', tmdbId));
+     logger.info(formatWatchlistLog(requestId, endpoint, session.user.id, 'deleted', tmdbId));
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error(formatWatchlistLog(requestId, endpoint, '-', 'error', undefined, `Error: ${error instanceof Error ? error.message : String(error)}`));

@@ -257,6 +257,6 @@ export async function invalidateTasteMap(userId: string): Promise<void> {
   await invalidateCache(`user:${userId}:type-profile`);
   await invalidateCache(`user:${userId}:genre-bias`);
   await invalidateCache(`user:${userId}:person-bias`);
-  await invalidateCache(`similar-users:${userId}`);
+  await invalidateCache(`similar-users:v2:${userId}`); // Fixed: added :v2 to match actual cache key
   await invalidateCache(`similarity:${userId}:*`);
 }

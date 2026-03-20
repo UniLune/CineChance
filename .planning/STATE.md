@@ -33,6 +33,8 @@ See: .planning/PROJECT.md (updated 2026-02-17)
 | 23 | Profile Creators Page Fix | ● Complete | 0 |
 | 24 | Taste Map DB Read Fix | ● Complete | DATA-01 |
 | 25 | Simplify TasteMap | ⏳ Planned | - |
+| 26 | Genre Profile Diversity Fix | ⏳ Planned | DIV-01 |
+| 27 | Taste Twins Validation | ⏳ Planned | VALID-01, VALID-02, VALID-03 |
 
 ---
 

@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { logger } from '@/lib/logger';
 
+/** API endpoints for TwinTasters component */
+const API_ENDPOINTS = {
+  CLEANUP_SIMILARITY: '/api/admin/cleanup/similarity',
+} as const;
+
 interface SimilarUser {
   userId: string;
   overallMatch: number;
@@ -19,14 +24,52 @@ interface TooltipState {
 
 interface TwinTastersProps {
   userId: string;
+  isAdmin?: boolean;
 }
 
-export default function TwinTasters({ userId }: TwinTastersProps) {
+/**
+ * TwinTasters component displays similar users ("taste twins") and provides
+ * an admin-only cleanup button for similarity cache.
+ *
+ * @param userId - The current user's ID to exclude from twin results
+ * @param isAdmin - Whether the user has admin privileges (shows cleanup button)
+ */
+export default function TwinTasters({ userId, isAdmin = false }: TwinTastersProps) {
   const [twins, setTwins] = useState<SimilarUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState>({ visible: false, x: 0, y: 0 });
+  const [cleanupLoading, setCleanupLoading] = useState(false); // Loading state for admin cleanup action
   const router = useRouter();
+
+  /**
+   * Handles similarity cache cleanup for admin users.
+   * Sends POST request to cleanup endpoint and shows alerts on success/failure.
+   *
+   * @returns Promise that resolves when cleanup is complete
+   */
+   const handleCleanup = async (): Promise<void> => {
+     setCleanupLoading(true);
+     try {
+       const response = await fetch(`${API_ENDPOINTS.CLEANUP_SIMILARITY}?type=orphaned`, {
+         method: 'POST',
+         cache: 'no-store',
+       });
+      if (response.ok) {
+        window.alert('Кеш успешно очищен');
+      } else {
+        window.alert('Ошибка при очистке кеша');
+      }
+    } catch (err) {
+      window.alert('Ошибка при очистке кеша');
+      logger.error('Failed to cleanup similarity cache', {
+        error: err instanceof Error ? err.message : String(err),
+        context: 'TwinTasters',
+      });
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
 
   useEffect(() => {
     const loadTwins = async () => {
@@ -114,19 +157,32 @@ export default function TwinTasters({ userId }: TwinTastersProps) {
     <div className="mt-8 p-6 bg-gray-900 rounded-lg border border-gray-800">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-xl font-bold text-white">Ваши близнецы вкуса</h2>
-        <button
-          onMouseEnter={(e) => {
-            const rect = e.currentTarget.getBoundingClientRect();
-            setTooltip({ visible: true, x: rect.left, y: rect.top });
-          }}
-          onMouseLeave={() => setTooltip({ ...tooltip, visible: false })}
-          className="text-gray-400 hover:text-purple-400 transition-colors"
-          title="Узнать как считается сходство"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleCleanup}
+              disabled={cleanupLoading}
+              className="text-sm bg-gray-700 hover:bg-gray-600 text-white py-1 px-3 rounded disabled:opacity-50 transition-colors"
+              aria-label="Очистить кеш близнецов"
+            >
+              {cleanupLoading ? 'Очистка...' : 'Очистить кеш близнецов'}
+            </button>
+          )}
+          <button
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setTooltip({ visible: true, x: rect.left, y: rect.top });
+            }}
+            onMouseLeave={() => setTooltip({ ...tooltip, visible: false })}
+            className="text-gray-400 hover:text-purple-400 transition-colors"
+            title="Узнать как считается сходство"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
       </div>
       <p className="text-gray-400 text-sm mb-6">
         Пользователи с похожим профилем предпочтений. Процент показывает общее сходство вкуса.

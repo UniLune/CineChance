@@ -18,6 +18,7 @@
 - **Client-side scroll tracking** - useState + useEffect with window scroll listener; conditional rendering of Scroll-to-Top button (search page)
 - **Conditional prop passing** - Use optional props (index?: number) to selectively enable/disable features without breaking consumers
 - **Similarity weight distribution** - Configurable weights for overallMatch: genres, movies (rating correlation), persons (to be removed in Phase 25)
+- **SimilarityScore cleanup strategy** - Orphaned records removal via admin API; scheduled cleanup optional; no cascade delete in DB yet
 
 ## Критические файлы
 - prisma/schema.prisma — 20+ моделей, композитные ключи

@@ -1,4 +1,8 @@
 import '@testing-library/jest-dom/vitest';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env
+dotenv.config();
 
 // Setup mock fetch for TMDB API
 import { vi } from 'vitest';

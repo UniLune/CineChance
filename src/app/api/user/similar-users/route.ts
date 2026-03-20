@@ -5,23 +5,37 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { rateLimit } from '@/middleware/rateLimit';
 import { computeAndStoreSimilarityScore, getCandidateUsersForSimilarity } from '@/lib/taste-map/similarity-storage';
-import { computeSimilarity, isSimilar } from '@/lib/taste-map/similarity';
+import { computeSimilarity, isSimilar, MIN_MATCH_THRESHOLD } from '@/lib/taste-map/similarity';
+import { getUserCompletedWatchCount } from '@/lib/taste-map/similarity-storage';
 
+/**
+ * Minimum number of movies in a user's watchlist to be eligible for similarity matching.
+ * Ensures users have sufficient viewing history for meaningful comparisons.
+ */
 const MIN_USER_HISTORY = 3;
+
+/**
+ * Minimum number of completed ratings/movies required for a candidate user to appear in results.
+ * Filters out users with insufficient viewing data.
+ */
+const MIN_COMPLETED_WATCH_COUNT = 3;
 // No longer limiting candidate search - check ALL users with shared movies
 // Previously limited to 200 active users, now finds all potential matches
 
 /**
  * GET /api/user/similar-users
  *
- * Find users with similar taste profiles from persistent database storage
- * 
+ * Find users with similar taste profiles from persistent database storage.
+ * Implements two-stage filtering:
+ *  1. MIN_MATCH_THRESHOLD (0.4) - ensures meaningful taste similarity
+ *  2. MIN_COMPLETED_WATCH_COUNT (3) - ensures candidate user has sufficient viewing history
+ *
  * Query parameters:
- * - limit: maximum number of similar users to return (default 10, max 50)
- * - freshOnly: only return recently computed scores (default false)
+ * - limit: maximum number of similar users to return (default 50, max 100)
+ * - freshOnly: only return fresh scores (computed within last 7 days)
  *
  * Returns:
- * - similarUsers: array of {userId, overallMatch, watchCount, memberSince}
+ * - similarUsers: array of {userId, overallMatch (percentage), watchCount, memberSince, source}
  * - fromDatabase: whether results came from persistent storage
  * - computedAt: timestamp of the stored/computed results
  */
@@ -192,12 +206,30 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const userInfoById = new Map(userInfoMap.map(u => [u.id, u]));
+     type UserInfo = {
+       id: string;
+       email: string;
+       createdAt: Date;
+     };
+     const userInfoById = new Map<string, UserInfo>(userInfoMap.map(u => [u.id, u] as [string, UserInfo]));
 
-    const enrichedResults = similarUsers.map(u => ({
+    // Get completed watch counts for candidate users
+    const completedCountsMap = await getUserCompletedWatchCount(userIds);
+
+    /**
+     * Filter similar users by match threshold and minimum completed watch count.
+     * - overallMatch >= MIN_MATCH_THRESHOLD (0.4) ensures meaningful taste similarity
+     * - completedCount >= MIN_COMPLETED_WATCH_COUNT (3) ensures sufficient viewing history
+     */
+    const filteredSimilarUsers = similarUsers.filter(u =>
+      u.overallMatch >= MIN_MATCH_THRESHOLD && (completedCountsMap.get(u.userId) ?? 0) >= MIN_COMPLETED_WATCH_COUNT
+    );
+
+    // Enrich filtered results
+    const enrichedResults = filteredSimilarUsers.map(u => ({
       userId: u.userId,
       overallMatch: Number((u.overallMatch * 100).toFixed(1)), // Convert to percentage
-      watchCount: userInfoById.get(u.userId)?.watchList.length || 0,
+      watchCount: completedCountsMap.get(u.userId) ?? 0,
       memberSince: userInfoById.get(u.userId)?.createdAt,
       source: fromDatabase ? 'database' : 'computed',
     }));

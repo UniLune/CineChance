@@ -14,6 +14,7 @@ describe('Acceptance 25-03: Remove Chart Visualizations', () => {
   const createMockTasteMap = (overrides?: Partial<TasteMap>): TasteMap => ({
     userId: 'user-123',
     genreProfile: { Action: 30, Drama: 25 },
+    genreCounts: { Action: 30, Drama: 25 },
     ratingDistribution: { high: 60, medium: 30, low: 10 },
     averageRating: 7.5,
     personProfiles: { actors: {}, directors: {} },
@@ -29,10 +30,11 @@ describe('Acceptance 25-03: Remove Chart Visualizations', () => {
         <TasteMapClient tasteMap={createMockTasteMap()} userId="user-123" />
       );
 
-      expect(html).toContain('Средний рейтинг');
-      expect(html).toContain('Положительные оценки');
+      // After Phase 25 simplification, summary stats correspond to the four metric cards
+      expect(html).toContain('Положительный настрой');
+      expect(html).toContain('Критический настрой');
       expect(html).toContain('Консистентность');
-      expect(html).toContain('Разнообразие жанров');
+      expect(html).toContain('Разнообразие');
     });
 
     it('should render computed metrics section', () => {

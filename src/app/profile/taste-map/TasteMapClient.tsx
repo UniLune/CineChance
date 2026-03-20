@@ -17,6 +17,8 @@ interface TasteMapClientProps {
   tasteMap: TasteMap | null;
   /** Current user ID for TwinTasters component */
   userId: string;
+  /** Whether the user is an admin (for showing admin controls) */
+  isAdmin?: boolean;
 }
 
 /**
@@ -34,7 +36,22 @@ interface TasteMapClientProps {
  * @param props - Component props
  * @returns Taste map profile UI or empty state
  */
-export default function TasteMapClient({ tasteMap, userId }: TasteMapClientProps) {
+/**
+ * Client component for rendering user's taste map profile.
+ *
+ * Displays:
+ * - Summary stats (average rating, positive/negative intensity, consistency, diversity)
+ * - Computed metrics details with descriptions
+ * - Behavior profile (rewatch rate, drop rate, completion rate)
+ * - TwinTasters (similar users) component with isAdmin prop passed for admin controls
+ *
+ * Charts (genre bar chart, rating pie chart) were removed in Phase 25-03
+ * to simplify the UI. Only text-based metrics remain.
+ *
+ * @param props - Component props
+ * @returns Taste map profile UI or empty state
+ */
+export default function TasteMapClient({ tasteMap, userId, isAdmin = false }: TasteMapClientProps) {
   // Empty state - show empty when genreCounts is empty or all zeros
   const genreCountsEmpty = !tasteMap?.genreCounts || Object.keys(tasteMap.genreCounts).length === 0;
   const allCountsZero = tasteMap?.genreCounts && Object.values(tasteMap.genreCounts).every(c => c === 0);
@@ -166,7 +183,7 @@ export default function TasteMapClient({ tasteMap, userId }: TasteMapClientProps
       </div>
 
       {/* Twin Tasters / Similar Users */}
-      <TwinTasters userId={userId} />
+      <TwinTasters userId={userId} isAdmin={isAdmin} />
     </div>
   );
 }

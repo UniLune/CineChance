@@ -343,7 +343,20 @@ Plans:
 
 ---
 
-### Phase 27: Genre Stats Display — PLANNED
+### Phase 27: Taste Twins Validation — PLANNED
+
+**Goal:** Validate and fix Taste Twins block — ensure only users with ≥3 completed movies and ≥40% match are shown, add orphan cleanup and admin controls.
+**Depends on:** Phase 25
+
+**Requirements:** [VALID-01, VALID-02, VALID-03]
+
+Plans:
+- [ ] 27-01-PLAN.md — Raise similarity threshold to 40%, filter candidates by completed watch count
+- [ ] 27-02-PLAN.md — Add orphaned similarity scores cleanup and admin UI
+
+---
+
+### Phase 28: Genre Stats Display — PLANNED
 
 **Goal:** Add "Ваши жанры" block to TasteMap page showing horizontal bars for each TMDB genre with movie count and average rating.
 **Depends on:** Phase 26
@@ -351,7 +364,7 @@ Plans:
 **Requirements:** [UI-02]
 
 Plans:
-- [ ] 27-01-PLAN.md — Add genreCounts computation and UI display
+- [ ] 28-01-PLAN.md — Add genreCounts computation and UI display
 
 ---
 

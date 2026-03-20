@@ -15,7 +15,7 @@ import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 import { MOVIE_STATUS_IDS } from '@/lib/movieStatusConstants';
-import type { GenreProfile, PersonProfiles } from './types';
+import type { GenreProfile } from './types';
 import { getTasteMap } from './redis';
 import { computeTasteMap } from './compute';
 
@@ -52,7 +52,11 @@ const WEIGHTS = {
   // personOverlap removed
 };
 
-// Similarity threshold from CONTEXT.md
+/**
+ * Minimum overall match percentage (0-1 scale) for users to be considered similar.
+ * Currently set to 0.4 (40%).
+ */
+export const MIN_MATCH_THRESHOLD = 0.4;
 
 
 /**
@@ -372,12 +376,12 @@ export function computeOverallMatch(result: SimilarityResult): number {
 }
 
 /**
- * Check if two users are similar based on similarity threshold
- * Returns true if overallMatch > 0.1 (combining all three metrics)
- * Previously only checked tasteSimilarity which was too restrictive
+ * Determines if two users are considered similar based on overall match.
+ * @param result - SimilarityResult containing overallMatch and other metrics
+ * @returns true if overallMatch >= MIN_MATCH_THRESHOLD (0.4), false otherwise
  */
 export function isSimilar(result: SimilarityResult): boolean {
-  return result.overallMatch > 0.1;
+  return result.overallMatch >= MIN_MATCH_THRESHOLD;
 }
 
 // Redis key patterns for similarity data

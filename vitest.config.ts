@@ -13,8 +13,10 @@ export default defineConfig({
     setupFiles: ['./vitest.setup.ts'],
     include: [
       'src/lib/__tests__/**/*.test.ts',
+      'src/lib/taste-map/__tests__/**/*.test.ts',
       'src/app/components/__tests__/**/*.test.{ts,tsx}',
       'src/app/api/**/__tests__/**/*.test.ts',
+      'src/app/admin/**/__tests__/**/*.test.{ts,tsx}',
       '.planning/phases/*/tdd/*.test.{ts,tsx}'
     ],
     testTimeout: 30000,

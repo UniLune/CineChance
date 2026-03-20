@@ -278,8 +278,95 @@ export async function deleteOldSimilarityScores(maxAgeDays: number = 365): Promi
 }
 
 /**
- * Get statistics about similarity scores in database
+ * Delete SimilarityScore records that reference non-existent users
+ * Cleans up orphaned records from deleted user accounts
  */
+export async function cleanupOrphanedScores(): Promise<{
+  deleted: number;
+  orphans: string[];
+}> {
+  // Step 1: Get all distinct user IDs from SimilarityScore (both columns)
+  const allScoreUserIds = await prisma.$queryRaw<string[]>`
+    SELECT DISTINCT "userIdA" as id FROM "SimilarityScore"
+    UNION
+    SELECT DISTINCT "userIdB" as id FROM "SimilarityScore"
+  `;
+
+  if (allScoreUserIds.length === 0) {
+    // No similarity scores at all
+    return { deleted: 0, orphans: [] };
+  }
+
+  // Step 2: Find which of these IDs exist in the User table
+  // Batch check to avoid query size limits
+  const BATCH_SIZE = 1000;
+  const existingUserIds = new Set<string>();
+
+  for (let i = 0; i < allScoreUserIds.length; i += BATCH_SIZE) {
+    const batch = allScoreUserIds.slice(i, i + BATCH_SIZE);
+    const existing = await prisma.user.findMany({
+      where: { id: { in: batch } },
+      select: { id: true },
+    });
+    for (const user of existing) {
+      existingUserIds.add(user.id);
+    }
+  }
+
+  // Step 3: Compute orphaned IDs (those not in User table)
+  const orphanedIds = allScoreUserIds.filter(id => !existingUserIds.has(id));
+
+  if (orphanedIds.length === 0) {
+    // No orphans found
+    return { deleted: 0, orphans: [] };
+  }
+
+  // Step 4: Delete all SimilarityScore records where userIdA OR userIdB is in orphaned set
+  const deleteResult = await prisma.similarityScore.deleteMany({
+    where: {
+      OR: [
+        { userIdA: { in: orphanedIds } },
+        { userIdB: { in: orphanedIds } },
+      ],
+    },
+  });
+
+  logger.info('Cleaned up orphaned similarity scores', {
+    deleted: deleteResult.count,
+    orphans: orphanedIds,
+    context: 'SimilarityStorage',
+  });
+
+  return {
+    deleted: deleteResult.count,
+    orphans: orphanedIds,
+  };
+}
+/**
+ * Get completed watch count for multiple users in a single query.
+ * Uses groupBy to avoid N+1. Returns Map where missing users are not included (caller should use ?? 0).
+ */
+export async function getUserCompletedWatchCount(
+  userIds: string[]
+): Promise<Map<string, number>> {
+  const results = await prisma.watchList.groupBy({
+    where: {
+      userId: { in: userIds },
+      statusId: { in: COMPLETED_STATUS_IDS },
+    },
+    by: ['userId'],
+    _count: true,
+  });
+
+  const countMap = new Map<string, number>();
+  for (const item of results) {
+    // Support both test mock shape (count) and real Prisma shape (_count)
+    const count = (item as any).count ?? (item as any)._count;
+    countMap.set(item.userId, count);
+  }
+  return countMap;
+}
+
 export async function getSimilarityScoreStats(): Promise<{
   totalScores: number;
   uniqueUsers: number;

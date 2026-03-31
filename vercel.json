@@ -2,12 +2,10 @@
   "crons": [
     {
       "path": "/api/recommendations/data-lifecycle/cron",
-      "description": "Daily cleanup + similarity at 4:00 UTC",
       "schedule": "0 4 * * *"
     },
     {
       "path": "/api/data-lifecycle/weekly",
-      "description": "Weekly orphan cleanup at 3:00 UTC Sunday",
       "schedule": "0 3 * * 0"
     }
   ]

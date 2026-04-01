@@ -20,6 +20,12 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 vi.mock('@/lib/taste-map/similarity-storage');
+vi.mock('@/middleware/rateLimit', () => ({
+  rateLimit: vi.fn().mockResolvedValue({ success: true }),
+}));
+vi.mock('@/lib/redis', () => ({
+  getRedis: vi.fn().mockReturnValue(null),
+}));
 vi.mock('next-auth', () => ({
   getServerSession: vi.fn(),
 }));

@@ -87,7 +87,7 @@ describe('Acceptance 25-03: Remove Chart Visualizations', () => {
     it('should show empty state when no genre data', () => {
       const html = renderToStaticMarkup(
         <TasteMapClient
-          tasteMap={createMockTasteMap({ genreProfile: {} })}
+          tasteMap={createMockTasteMap({ genreCounts: {}, genreProfile: {} })}
           userId="user-123"
         />
       );
@@ -99,7 +99,7 @@ describe('Acceptance 25-03: Remove Chart Visualizations', () => {
     it('should not show any chart blocks in empty state', () => {
       const html = renderToStaticMarkup(
         <TasteMapClient
-          tasteMap={createMockTasteMap({ genreProfile: {} })}
+          tasteMap={createMockTasteMap({ genreCounts: {}, genreProfile: {} })}
           userId="user-123"
         />
       );

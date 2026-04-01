@@ -9,9 +9,9 @@ import { rateLimit } from '@/middleware/rateLimit';
 import { withCache } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 
-async function calculateTypeBreakdown(
+function calculateTypeBreakdown(
   allRecords: Array<{ mediaType: string }>
-): Promise<{ movie: number; tv: number; cartoon: number; anime: number }> {
+): { movie: number; tv: number; cartoon: number; anime: number } {
   const counts = { movie: 0, tv: 0, cartoon: 0, anime: 0 };
   
   for (const record of allRecords) {
@@ -34,7 +34,7 @@ async function fetchStats(userId: string, mediaFilter?: string | null) {
     ]
   };
 
-  const [watchedCount, wantToWatchCount, droppedCount, hiddenCount, allRecords] = await Promise.all([
+  const [watchedCount, wantToWatchCount, droppedCount, hiddenCount, allRecords, allRecordsForBreakdown] = await Promise.all([
     prisma.watchList.count({
       where: {
         userId,
@@ -53,9 +53,13 @@ async function fetchStats(userId: string, mediaFilter?: string | null) {
       where: { userId, statusId: statusFilter, mediaType: mediaFilter || undefined },
       select: { mediaType: true },
     }),
+    prisma.watchList.findMany({
+      where: { userId, statusId: statusFilter },
+      select: { mediaType: true },
+    }),
   ]);
 
-  const typeCounts = calculateTypeBreakdown(allRecords);
+  const typeCounts = calculateTypeBreakdown(allRecordsForBreakdown);
 
   const avgRatingResult = await prisma.watchList.aggregate({
     where: {

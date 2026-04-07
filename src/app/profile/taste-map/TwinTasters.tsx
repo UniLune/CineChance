@@ -75,7 +75,7 @@ export default function TwinTasters({ userId, isAdmin = false }: TwinTastersProp
     const loadTwins = async () => {
       setLoading(true);
       try {
-        const response = await fetch('/api/user/similar-users?limit=15', {
+        const response = await fetch('/api/user/similar-users?limit=15&fresh=true', {
           cache: 'no-store',
         });
 

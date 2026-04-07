@@ -10,28 +10,51 @@ vi.mock('@/app/profile/taste-map/TwinTasters', () => ({
 import TasteMapClient from '@/app/profile/taste-map/TasteMapClient';
 import type { TasteMap } from '@/lib/taste-map/types';
 
-// All 19 TMDB genre names (as they appear in TMDB API)
+// All 19 TMDB genre names in Russian (as displayed in the component)
 const TMDB_GENRES = [
-  'Action',
-  'Adventure',
-  'Animation',
-  'Comedy',
-  'Crime',
-  'Documentary',
-  'Drama',
-  'Family',
-  'Fantasy',
-  'History',
-  'Horror',
-  'Music',
-  'Mystery',
-  'Romance',
-  'Science Fiction',
-  'TV Movie',
-  'Thriller',
-  'War',
-  'Western',
+  'Боевик',
+  'Приключения',
+  'Анимация',
+  'Комедия',
+  'Криминал',
+  'Документальный',
+  'Драма',
+  'Семейный',
+  'Фэнтези',
+  'Исторический',
+  'Ужасы',
+  'Музыка',
+  'Мистика',
+  'Мелодрама',
+  'Научная фантастика',
+  'Телефильм',
+  'Триллер',
+  'Военный',
+  'Вестерн',
 ];
+
+// Mapping from Russian genre names to English keys for genreCounts lookup
+const RUSSIAN_TO_ENGLISH: Record<string, string> = {
+  'Боевик': 'Action',
+  'Приключения': 'Adventure',
+  'Анимация': 'Animation',
+  'Комедия': 'Comedy',
+  'Криминал': 'Crime',
+  'Документальный': 'Documentary',
+  'Драма': 'Drama',
+  'Семейный': 'Family',
+  'Фэнтези': 'Fantasy',
+  'Исторический': 'History',
+  'Ужасы': 'Horror',
+  'Музыка': 'Music',
+  'Мистика': 'Mystery',
+  'Мелодрама': 'Romance',
+  'Научная фантастика': 'Science Fiction',
+  'Телефильм': 'TV Movie',
+  'Триллер': 'Thriller',
+  'Военный': 'War',
+  'Вестерн': 'Western',
+};
 
 describe('Acceptance 27: "Ваши жанры" Block', () => {
   const createMockTasteMap = (
@@ -97,11 +120,11 @@ describe('Acceptance 27: "Ваши жанры" Block', () => {
       const genreCounts = createMockTasteMap().genreCounts!;
       const totalWatched = (Object.values(genreCounts) as number[]).reduce((a, b) => a + b, 0);
       
-      // Drama has 25 out of 106 total ≈ 23.6%
-      // Action has 15 out of 106 total ≈ 14.2%
+      // Драма has 25 out of 106 total ≈ 23.6%
+      // Боевик has 15 out of 106 total ≈ 14.2%
       // These are approximate because we're checking static HTML widths
-      expect(html).toContain('Drama'); // Should be one of the widest bars
-      expect(html).toContain('Action');
+      expect(html).toContain('Драма'); // Should be one of the widest bars
+      expect(html).toContain('Боевик');
     });
 
     it('should position "Ваши жанры" before TwinTasters', () => {
@@ -124,9 +147,10 @@ describe('Acceptance 27: "Ваши жанры" Block', () => {
         <TasteMapClient tasteMap={createMockTasteMap()} userId="user-123" />
       );
 
-      // Format: "Drama (25)"
+      // Format: "Драма (25)"
       TMDB_GENRES.forEach((genre) => {
-        const count = createMockTasteMap().genreCounts?.[genre] ?? 0;
+        const englishKey = RUSSIAN_TO_ENGLISH[genre];
+        const count = createMockTasteMap().genreCounts?.[englishKey] ?? 0;
         if (count > 0) {
           expect(html).toContain(`${genre} (${count})`);
         }
@@ -155,9 +179,9 @@ describe('Acceptance 27: "Ваши жанры" Block', () => {
       );
 
       // Genres without ratings should show dash, but count still visible
-      // Western count = 1, Documentary count = 2
-      expect(html).toContain('Western (1) —');
-      expect(html).toContain('Documentary (2) —');
+      // Вестерн count = 1, Документальный count = 2
+      expect(html).toContain('Вестерн (1) —');
+      expect(html).toContain('Документальный (2) —');
     });
   });
 
@@ -227,11 +251,11 @@ describe('Acceptance 27: "Ваши жанры" Block', () => {
       });
 
       // Genres with counts should show the count
-      expect(html).toContain('Action (10)');
-      expect(html).toContain('Drama (5)');
+      expect(html).toContain('Боевик (10)');
+      expect(html).toContain('Драма (5)');
 
       // Genres without counts should show (0) or —
-      expect(html).toContain('Comedy (0)');
+      expect(html).toContain('Комедия (0)');
     });
 
     it('should work when genreProfile is empty but genreCounts exist', () => {
@@ -243,8 +267,8 @@ describe('Acceptance 27: "Ваши жанры" Block', () => {
       );
 
       // Should show genres with counts but ratings as "—"
-      expect(html).toContain('Action (15) —');
-      expect(html).toContain('Drama (25) —');
+      expect(html).toContain('Боевик (15) —');
+      expect(html).toContain('Драма (25) —');
     });
   });
 
@@ -263,15 +287,15 @@ describe('Acceptance 27: "Ваши жанры" Block', () => {
       const { genreCounts } = createMockTasteMap();
       const total = (Object.values(genreCounts!) as number[]).reduce((a, b) => a + b, 0);
       
-      // Drama (25) should be wider than Western (1)
+      // Драма (25) should be wider than Вестерн (1)
       const html = renderToStaticMarkup(
         <TasteMapClient tasteMap={createMockTasteMap()} userId="user-123" />
       );
 
       // We can verify proportional scaling by checking that the higher count genre
       // appears before the lower count one (sorted by count descending likely)
-      const dramaIndex = html.indexOf('Drama');
-      const westernIndex = html.indexOf('Western');
+      const dramaIndex = html.indexOf('Драма');
+      const westernIndex = html.indexOf('Вестерн');
       expect(dramaIndex).toBeLessThan(westernIndex);
     });
 
@@ -280,10 +304,10 @@ describe('Acceptance 27: "Ваши жанры" Block', () => {
         <TasteMapClient tasteMap={createMockTasteMap()} userId="user-123" />
       );
 
-      // Check format: "Drama (25)"
-      expect(html).toMatch(/Drama \(25\)/);
-      expect(html).toMatch(/Action \(15\)/);
-      expect(html).toMatch(/Comedy \(20\)/);
+      // Check format: "Драма (25)"
+      expect(html).toMatch(/Драма \(25\)/);
+      expect(html).toMatch(/Боевик \(15\)/);
+      expect(html).toMatch(/Комедия \(20\)/);
     });
 
     it('should satisfy AC4: Average ratings displayed with one decimal place', () => {

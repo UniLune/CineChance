@@ -7,6 +7,8 @@
 import { prisma } from '@/lib/prisma';
 import { fetchMediaDetails } from '@/lib/tmdb';
 import { MOVIE_STATUS_IDS } from '@/lib/movieStatusConstants';
+import { GENRE_REVERSE_TRANSLATIONS } from '@/lib/genreData';
+import { TMDB_GENRES } from '@/lib/genreData';
 import type {
   TasteMap,
   GenreProfile,
@@ -31,6 +33,35 @@ const COMPLETED_STATUS_IDS = [MOVIE_STATUS_IDS.WATCHED, MOVIE_STATUS_IDS.REWATCH
 const TMDB_GENRE_COUNT = 19 as const;
 
 /**
+ * Normalize genre name to English using reverse translation.
+ * TMDB returns Russian genre names when language=ru-RU is used.
+ * Returns null for composite/unknown genres (e.g. "Боевик и Приключения").
+ * Only the 19 official TMDB genres are counted.
+ */
+function normalizeGenreName(name: string): string | null {
+  // Already an English TMDB genre — pass through as-is
+  if ((TMDB_GENRES as readonly string[]).includes(name)) {
+    return name;
+  }
+
+  // Direct match in reverse translations (Russian → English)
+  if (GENRE_REVERSE_TRANSLATIONS[name]) {
+    return GENRE_REVERSE_TRANSLATIONS[name];
+  }
+
+  // Case-insensitive match for Russian variants
+  const lowerName = name.toLowerCase();
+  for (const [ru, en] of Object.entries(GENRE_REVERSE_TRANSLATIONS)) {
+    if (ru.toLowerCase() === lowerName) {
+      return en;
+    }
+  }
+
+  // Composite or unknown genre — skip it
+  return null;
+}
+
+/**
  * Compute genre counts from watched movies
  * Counts how many times each genre appears across all watched movies
  * Each movie contributes once per genre (deduplicates within the same movie)
@@ -44,7 +75,10 @@ export function computeGenreCounts(watchedMovies: WatchListItemFull[]): Record<s
     // Deduplicate genres within the same movie
     const uniqueGenres = new Set<string>();
     for (const genre of genres) {
-      uniqueGenres.add(genre.name);
+      const normalized = normalizeGenreName(genre.name);
+      if (normalized) {
+        uniqueGenres.add(normalized);
+      }
     }
     for (const name of uniqueGenres) {
       counts[name] = (counts[name] || 0) + 1;
@@ -65,10 +99,12 @@ export function computeGenreProfile(watchedMovies: WatchListItemFull[]): GenrePr
     const genres = movie.genres || [];
 
     for (const genre of genres) {
-      const existing = genreMap.get(genre.name) || { totalRating: 0, count: 0 };
+      const normalized = normalizeGenreName(genre.name);
+      if (!normalized) continue;
+      const existing = genreMap.get(normalized) || { totalRating: 0, count: 0 };
       existing.totalRating += rating;
       existing.count += 1;
-      genreMap.set(genre.name, existing);
+      genreMap.set(normalized, existing);
     }
   }
 
@@ -220,10 +256,10 @@ export function computeAverageRating(watchedMovies: WatchListItemFull[]): number
  * Compute behavior profile from watch list data
  */
 export async function computeBehaviorProfile(
-  userId: string
+  userId: string,
+  preFetched?: { statusId: number; watchCount: number }[]
 ): Promise<BehaviorProfile> {
-  // Get all user items with status and watch count
-  const allItems = await prisma.watchList.findMany({
+  const allItems = preFetched ?? await prisma.watchList.findMany({
     where: { userId },
     select: {
       statusId: true,
@@ -341,18 +377,39 @@ async function fetchMovieCredits(
 }
 
 /**
+ * Normalize custom mediaType values from DB to TMDB-compatible types.
+ * DB may store 'cartoon' or 'anime', but TMDB only supports 'movie' and 'tv'.
+ */
+function normalizeMediaType(mediaType: string): 'movie' | 'tv' {
+  // Cartoons on TMDB are typically movies
+  if (mediaType === 'cartoon') return 'movie';
+  // Anime on TMDB is typically TV series
+  if (mediaType === 'anime') return 'tv';
+  // Fallback: if it's already a valid TMDB type, use it
+  if (mediaType === 'movie' || mediaType === 'tv') return mediaType;
+  // Default to movie for unknown types
+  return 'movie';
+}
+
+/** Max TMDB requests to send in parallel to avoid rate limiting */
+const TMDB_BATCH_SIZE = 5 as const;
+
+/** Delay between TMDB request batches (ms) to respect rate limits */
+const TMDB_BATCH_DELAY_MS = 200 as const;
+
+/**
  * Build complete watch list item with TMDB details
  */
 async function buildWatchListItem(
   item: { tmdbId: number; mediaType: string; userRating: number | null; voteAverage: number }
 ): Promise<WatchListItemFull> {
-  const mediaType = item.mediaType as 'movie' | 'tv';
+  const tmdbMediaType = normalizeMediaType(item.mediaType);
   
   // Fetch TMDB details (includes genres)
-  const details = await fetchMediaDetails(item.tmdbId, mediaType);
+  const details = await fetchMediaDetails(item.tmdbId, tmdbMediaType);
   
   // Fetch credits separately
-  const credits = await fetchMovieCredits(item.tmdbId, mediaType);
+  const credits = await fetchMovieCredits(item.tmdbId, tmdbMediaType);
   
   return {
     userId: '', // Not needed for computation
@@ -363,6 +420,31 @@ async function buildWatchListItem(
     genres: details?.genres || [],
     credits: credits || undefined,
   };
+}
+
+/**
+ * Process items in batches with delays to avoid TMDB rate limiting
+ */
+async function processInBatches<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  batchSize: number = TMDB_BATCH_SIZE,
+  delayMs: number = TMDB_BATCH_DELAY_MS
+): Promise<R[]> {
+  const results: R[] = [];
+  
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batch.map(fn));
+    results.push(...batchResults);
+    
+    // Delay between batches (but not after the last one)
+    if (i + batchSize < items.length) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+  
+  return results;
 }
 
 /**
@@ -389,6 +471,7 @@ export async function computeTasteMap(userId: string): Promise<TasteMap> {
       userId,
       genreProfile: {},
       genreCounts: {},
+      totalWatched: 0,
       ratingDistribution: { high: 0, medium: 0, low: 0 },
       averageRating: 0,
       personProfiles: { actors: {}, directors: {} },
@@ -398,11 +481,10 @@ export async function computeTasteMap(userId: string): Promise<TasteMap> {
     };
   }
 
-  // Build full items with TMDB data
-  // Limit to avoid too many API calls - batch fetch
-  const itemsToFetch = watchedItems.slice(0, 50); // Limit for performance
-  const watchListItems = await Promise.all(
-    itemsToFetch.map(buildWatchListItem)
+  // Build full items with TMDB data (batched to avoid rate limiting)
+  const watchListItems = await processInBatches(
+    watchedItems,
+    buildWatchListItem
   );
 
   // Compute profiles
@@ -412,13 +494,20 @@ export async function computeTasteMap(userId: string): Promise<TasteMap> {
   const typeProfile = computeTypeProfile(watchListItems);
   const ratingDistribution = computeRatingDistribution(watchListItems);
   const averageRating = computeAverageRating(watchListItems);
-  const behaviorProfile = await computeBehaviorProfile(userId);
+
+  // Fetch all items for behavior profile in a single query
+  const allItems = await prisma.watchList.findMany({
+    where: { userId },
+    select: { statusId: true, watchCount: true },
+  });
+  const behaviorProfile = await computeBehaviorProfile(userId, allItems);
   const computedMetrics = computeMetrics(genreProfile, ratingDistribution);
 
   const tasteMap: TasteMap = {
     userId,
     genreProfile,
     genreCounts,
+    totalWatched: watchedItems.length,
     ratingDistribution,
     averageRating,
     personProfiles,
@@ -426,24 +515,6 @@ export async function computeTasteMap(userId: string): Promise<TasteMap> {
     computedMetrics,
     updatedAt: new Date(),
   };
-
-  return tasteMap;
-}
-
-/**
- * Compute and store taste map to Redis
- */
-export async function recomputeTasteMap(userId: string): Promise<TasteMap> {
-  const tasteMap = await computeTasteMap(userId);
-
-  // Store to Redis
-  await storeTasteMap(userId, tasteMap);
-  await storeGenreProfile(userId, tasteMap.genreProfile);
-  await storePersonProfile(userId, tasteMap.personProfiles);
-  await storeTypeProfile(userId, {
-    movie: tasteMap.ratingDistribution.high, // This is simplified
-    tv: 0,
-  });
 
   return tasteMap;
 }

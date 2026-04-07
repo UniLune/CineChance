@@ -22,7 +22,7 @@ export const SIMILARITY_TTL_HOURS = 168; // 7 days
 export async function computeAndStoreSimilarityScore(
   userIdA: string,
   userIdB: string,
-  computedBy: 'scheduler' | 'manual' | 'on-demand' = 'on-demand'
+  options: { computedBy?: 'scheduler' | 'manual' | 'on-demand'; forceFresh?: boolean } = {}
 ): Promise<{
   overallMatch: number;
   tasteSimilarity: number;
@@ -30,6 +30,8 @@ export async function computeAndStoreSimilarityScore(
   personOverlap: number;
 }> {
   try {
+    const { computedBy = 'on-demand', forceFresh = false } = options;
+
     // Ensure consistent ordering (userIdA < userIdB)
     const [orderedA, orderedB] = userIdA < userIdB ? [userIdA, userIdB] : [userIdB, userIdA];
 
@@ -38,8 +40,8 @@ export async function computeAndStoreSimilarityScore(
 
     // Load taste maps with caching
     const [tasteMapA, tasteMapB] = await Promise.all([
-      getTasteMap(orderedA, () => computeTasteMap(orderedA)),
-      getTasteMap(orderedB, () => computeTasteMap(orderedB)),
+      getTasteMap(orderedA, () => computeTasteMap(orderedA), forceFresh),
+      getTasteMap(orderedB, () => computeTasteMap(orderedB), forceFresh),
     ]);
 
     if (!tasteMapA || !tasteMapB) {
@@ -47,7 +49,7 @@ export async function computeAndStoreSimilarityScore(
     }
 
     // Compute similarity with patterns for full detail
-    const similarityResult = await computeSimilarity(orderedA, orderedB, true);
+    const similarityResult = await computeSimilarity(orderedA, orderedB, { includePatterns: true, forceFresh });
 
     // Create snapshots for reproducibility
     const tasteMapASnapshot = generateTasteMapSnapshot(tasteMapA);
@@ -288,7 +290,7 @@ export async function computeSimilarityForUser(
     }
 
     try {
-      await computeAndStoreSimilarityScore(userId, candidateId, 'on-demand');
+      await computeAndStoreSimilarityScore(userId, candidateId, { computedBy: 'on-demand' });
       computed++;
     } catch (error) {
       errors++;

@@ -12,12 +12,12 @@ import type { TasteMap, GenreProfile, PersonProfiles, TypeProfile } from './type
 // TTL: 24 hours in seconds
 export const TTL_24H = 86400;
 
-// Key patterns from CONTEXT.md
+// Key patterns v3: normalized genre keys + normalized mediaType (cartoon→movie, anime→tv)
 const KEY_PATTERNS = {
-  tasteMap: (userId: string) => `user:${userId}:taste-map`,
-  genreProfile: (userId: string) => `user:${userId}:genre-profile`,
-  personProfile: (userId: string) => `user:${userId}:person-profile`,
-  typeProfile: (userId: string) => `user:${userId}:type-profile`,
+  tasteMap: (userId: string) => `user:${userId}:taste-map:v3`,
+  genreProfile: (userId: string) => `user:${userId}:genre-profile:v3`,
+  personProfile: (userId: string) => `user:${userId}:person-profile:v3`,
+  typeProfile: (userId: string) => `user:${userId}:type-profile:v3`,
 };
 
 /**
@@ -47,12 +47,16 @@ export async function storeTasteMap(userId: string, tasteMap: TasteMap): Promise
  */
 export async function getTasteMap(
   userId: string,
-  computeFn?: () => Promise<TasteMap>
+  computeFn?: () => Promise<TasteMap>,
+  forceFresh?: boolean
 ): Promise<TasteMap | null> {
+  if (forceFresh && computeFn) {
+    return computeFn();
+  }
+
   const redis = getRedis();
   if (!redis) return null;
 
-  // If computeFn provided, use withCache for automatic cache-aside
   if (computeFn) {
     return withCache<TasteMap>(
       KEY_PATTERNS.tasteMap(userId),
@@ -61,7 +65,6 @@ export async function getTasteMap(
     );
   }
 
-  // Otherwise just get from cache
   try {
     const cached = await redis.get<string>(KEY_PATTERNS.tasteMap(userId));
     if (cached) {
@@ -250,13 +253,10 @@ export async function getTypeProfile(
  * Invalidate all taste-map related cache keys for a user
  */
 export async function invalidateTasteMap(userId: string): Promise<void> {
-  // Invalidate using pattern matching
-  await invalidateCache(`user:${userId}:taste-map`);
-  await invalidateCache(`user:${userId}:genre-profile`);
-  await invalidateCache(`user:${userId}:person-profile`);
-  await invalidateCache(`user:${userId}:type-profile`);
-  await invalidateCache(`user:${userId}:genre-bias`);
-  await invalidateCache(`user:${userId}:person-bias`);
-  await invalidateCache(`similar-users:v2:${userId}`); // Fixed: added :v2 to match actual cache key
-  await invalidateCache(`similarity:${userId}:*`);
+  await invalidateCache(`user:${userId}:taste-map:v3`);
+  await invalidateCache(`user:${userId}:genre-profile:v3`);
+  await invalidateCache(`user:${userId}:person-profile:v3`);
+  await invalidateCache(`user:${userId}:type-profile:v3`);
+  await invalidateCache(`similar-users:v2:${userId}`);
+  await invalidateCache(`similarity:v2:${userId}:*`);
 }

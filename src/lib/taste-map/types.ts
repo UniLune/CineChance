@@ -50,6 +50,8 @@ export interface TasteMap {
   genreProfile: GenreProfile;
   /** Movie count per genre (e.g., { "Action": 15, "Drama": 12 }) */
   genreCounts: Record<string, number>;
+  /** Total number of watched movies (for percentage calculation) */
+  totalWatched: number;
   ratingDistribution: RatingDistribution;
   averageRating: number;    // 0-10 scale
   personProfiles: PersonProfiles;

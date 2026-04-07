@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/auth';
 import { redirect } from 'next/navigation';
-import { getTasteMap, computeTasteMap } from '@/lib/taste-map';
+import { computeTasteMap } from '@/lib/taste-map';
 import TasteMapClient from './TasteMapClient';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,8 @@ export const dynamicParams = true;
  * Server component that:
  * - Checks authentication and redirects if not logged in
  * - Derives isAdmin flag by comparing user ID to ADMIN_USER_ID
- * - Fetches taste map data with automatic caching
+ * - Computes taste map data fresh on every request (no caching)
+ *   This is a debug page — caching would hide issues with algorithm changes.
  * - Renders TasteMapClient with required props
  *
  * @returns Taste map page UI
@@ -27,8 +28,8 @@ export default async function TasteMapPage() {
 
   const isAdmin = session.user.id === process.env.ADMIN_USER_ID; // Derive admin status from env
 
-   // Fetch taste map with automatic caching
-   const tasteMap = await getTasteMap(session.user.id, () => computeTasteMap(session.user.id));
+  // Always compute fresh — no caching for debug page
+  const tasteMap = await computeTasteMap(session.user.id);
 
    return (
      <div className="min-h-screen bg-gray-950 py-6 md:py-8">

@@ -72,11 +72,11 @@ export async function GET(
     }
 
     // Get similarity metrics WITH detailed rating patterns
-    const similarityResult = await computeSimilarity(currentUserId, comparedUserId, true);
+    const similarityResult = await computeSimilarity(currentUserId, comparedUserId, { includePatterns: true });
 
     // Store similarity score to persistent database for consistency across API calls
     try {
-      await computeAndStoreSimilarityScore(currentUserId, comparedUserId, 'on-demand');
+      await computeAndStoreSimilarityScore(currentUserId, comparedUserId, { computedBy: 'on-demand' });
     } catch (err) {
       logger.debug('Failed to store similarity score', {
         error: err instanceof Error ? err.message : String(err),

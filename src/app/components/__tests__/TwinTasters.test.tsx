@@ -71,6 +71,10 @@ describe('TwinTasters', () => {
       const user = userEvent.setup();
       mockFetch.mockResolvedValueOnce({
         ok: true,
+        json: async () => mockTwinsData,
+      });
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
         json: async () => ({}),
       });
 
@@ -91,6 +95,10 @@ describe('TwinTasters', () => {
 
     it('clicking button shows success toast', async () => {
       const user = userEvent.setup();
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockTwinsData,
+      });
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ success: true }),
@@ -118,6 +126,10 @@ describe('TwinTasters', () => {
     it('shows error toast on API failure', async () => {
       const user = userEvent.setup();
       mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockTwinsData,
+      });
+      mockFetch.mockResolvedValueOnce({
         ok: false,
         json: async () => ({ error: 'Unauthorized' }),
       });
@@ -142,14 +154,14 @@ describe('TwinTasters', () => {
 
     it('button is disabled during loading state', async () => {
       const user = userEvent.setup();
-      let resolvePromise: (value: unknown) => void;
+      let resolvePromise: ((value: unknown) => void) | undefined;
       const loadingPromise = new Promise((resolve) => {
         resolvePromise = resolve;
       });
 
       mockFetch.mockImplementationOnce(() => loadingPromise);
 
-      const { rerender } = render(<TwinTasters userId="testuser" isAdmin={true} />);
+      render(<TwinTasters userId="testuser" isAdmin={true} />);
 
       await waitFor(() => {
         const button = screen.queryByText('Очистить кеш близнецов');
@@ -180,8 +192,9 @@ describe('TwinTasters', () => {
         expect(screen.getByText('Ваши близнецы вкуса')).toBeInTheDocument();
       });
 
-       expect(screen.getByText('Киномана user123')).toBeInTheDocument();
-      expect(screen.getByText('85%')).toBeInTheDocument();
+      expect(screen.getByText('Киномана user123')).toBeInTheDocument();
+      // 85.5 rounds to 86 with toFixed(0)
+      expect(screen.getByText('86%')).toBeInTheDocument();
     });
 
     it('shows error state on API failure', async () => {

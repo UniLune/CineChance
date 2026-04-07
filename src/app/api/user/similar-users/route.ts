@@ -62,7 +62,8 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = session.user.id;
-    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100); // Increased default and max limits
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 100);
+    const fresh = searchParams.get('fresh') === 'true';
 
     // Check user has minimum history
     const watchListCount = await prisma.watchList.count({
@@ -78,8 +79,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Try Redis cache first (fast path)
-    const cachedTwins = await getSimilarUsers(userId);
+    // Try Redis cache first (fast path) - skip when fresh=true
+    let cachedTwins: import('@/lib/taste-map/similarity').SimilarUser[] = [];
+    if (!fresh) {
+      cachedTwins = await getSimilarUsers(userId);
+    }
 
     if (cachedTwins.length > 0) {
       logger.debug('Returning similar users from Redis cache', {
@@ -165,11 +169,11 @@ export async function GET(request: NextRequest) {
       let similarCount = 0;
       for (const candidateId of candidateIds) {
         try {
-          const result = await computeSimilarity(userId, candidateId, false);
+          const result = await computeSimilarity(userId, candidateId, { includePatterns: false, forceFresh: fresh });
 
           if (isSimilar(result)) {
             similarCount++;
-            await computeAndStoreSimilarityScore(userId, candidateId, 'on-demand');
+            await computeAndStoreSimilarityScore(userId, candidateId, { computedBy: 'on-demand', forceFresh: fresh });
 
             const stored = await prisma.similarityScore.findUnique({
               where: {
@@ -239,10 +243,10 @@ export async function GET(request: NextRequest) {
             context: 'SimilarUsersAPI',
           });
 
-          const result = await computeSimilarity(userId, otherUserId, false);
+          const result = await computeSimilarity(userId, otherUserId, { includePatterns: false, forceFresh: fresh });
 
           if (isSimilar(result)) {
-            await computeAndStoreSimilarityScore(userId, otherUserId, 'on-demand');
+            await computeAndStoreSimilarityScore(userId, otherUserId, { computedBy: 'on-demand', forceFresh: fresh });
 
             const refreshed = await prisma.similarityScore.findUnique({
               where: {

@@ -9,7 +9,6 @@ import { logger } from "@/lib/logger";
 import { rateLimit } from "@/middleware/rateLimit";
 import { calculateWeightedRating } from "@/lib/calculateWeightedRating";
 import { invalidateUserCache } from "@/lib/redis";
-import { recomputeTasteMap } from '@/lib/taste-map/compute';
 import { invalidateTasteMap } from '@/lib/taste-map/redis';
 import { deleteSimilarityScoresByUser, computeSimilarityForUser } from '@/lib/taste-map/similarity-storage';
 import { MOVIE_STATUS_IDS } from '@/lib/movieStatusConstants';
@@ -238,8 +237,7 @@ export async function POST(req: Request) {
        // Trigger background taste map recomputation and similarity computation
        after(async () => {
          try {
-           await recomputeTasteMap(session.user.id);
-           await invalidateTasteMap(session.user.id);
+            await invalidateTasteMap(session.user.id);
            await deleteSimilarityScoresByUser(session.user.id);
            
            // Trigger similarity computation to make user visible to others
@@ -376,8 +374,7 @@ export async function POST(req: Request) {
        // Trigger background taste map recomputation and similarity computation
        after(async () => {
          try {
-           await recomputeTasteMap(session.user.id);
-           await invalidateTasteMap(session.user.id);
+            await invalidateTasteMap(session.user.id);
            await deleteSimilarityScoresByUser(session.user.id);
            
            // Trigger similarity computation to make user visible to others
@@ -578,12 +575,11 @@ export async function POST(req: Request) {
       }
      }
 
-     // Trigger background taste map recomputation and similarity computation
-     after(async () => {
-       try {
-         await recomputeTasteMap(session.user.id);
-         await invalidateTasteMap(session.user.id);
-         await deleteSimilarityScoresByUser(session.user.id);
+        // Trigger background taste map invalidation and similarity computation
+        after(async () => {
+          try {
+            await invalidateTasteMap(session.user.id);
+            await deleteSimilarityScoresByUser(session.user.id);
          
          // Trigger similarity computation to make user visible to others
          // Only if user has 3+ completed watches
@@ -657,12 +653,11 @@ export async function DELETE(req: Request) {
 
      await invalidateUserCache(session.user.id);
 
-     // Trigger background taste map recomputation and similarity invalidation
-     after(async () => {
-       try {
-         await recomputeTasteMap(session.user.id);
-         await invalidateTasteMap(session.user.id);
-         await deleteSimilarityScoresByUser(session.user.id);
+      // Trigger background taste map invalidation and similarity invalidation
+      after(async () => {
+        try {
+          await invalidateTasteMap(session.user.id);
+          await deleteSimilarityScoresByUser(session.user.id);
        } catch (error) {
          logger.error('Background invalidation failed', {
            error: error instanceof Error ? error.message : String(error),

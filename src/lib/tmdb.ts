@@ -498,7 +498,7 @@ export const getMediaCredits = async (
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      logger.debug('Ошибка TMDB credits', { status: response.status, context: 'TMDB' });
+      logger.error('Ошибка TMDB details', { status: response.status, context: 'TMDB' });
       return null;
     }
 

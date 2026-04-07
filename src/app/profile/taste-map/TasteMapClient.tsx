@@ -2,37 +2,7 @@
 
 import type { TasteMap } from '@/lib/taste-map/types';
 import TwinTasters from './TwinTasters';
-
-/** TMDB movie genre names in alphabetical order */
-const TMDB_GENRES = [
-  'Action', 'Adventure', 'Animation', 'Comedy', 'Crime',
-  'Documentary', 'Drama', 'Family', 'Fantasy', 'History',
-  'Horror', 'Music', 'Mystery', 'Romance', 'Science Fiction',
-  'TV Movie', 'Thriller', 'War', 'Western'
-] as const;
-
-/** Genre name translations (English → Russian) */
-const GENRE_TRANSLATIONS: Record<string, string> = {
-  'Action': 'Боевик',
-  'Adventure': 'Приключения',
-  'Animation': 'Анимация',
-  'Comedy': 'Комедия',
-  'Crime': 'Криминал',
-  'Documentary': 'Документальный',
-  'Drama': 'Драма',
-  'Family': 'Семейный',
-  'Fantasy': 'Фэнтези',
-  'History': 'Исторический',
-  'Horror': 'Ужасы',
-  'Music': 'Музыка',
-  'Mystery': 'Мистика',
-  'Romance': 'Мелодрама',
-  'Science Fiction': 'Научная фантастика',
-  'TV Movie': 'Телефильм',
-  'Thriller': 'Триллер',
-  'War': 'Военный',
-  'Western': 'Вестерн',
-};
+import { TMDB_GENRES, GENRE_TRANSLATIONS } from '@/lib/genreData';
 
 /** Translate genre name to Russian */
 function translateGenre(genre: string): string {
@@ -185,31 +155,31 @@ export default function TasteMapClient({ tasteMap, userId, isAdmin = false }: Ta
         </div>
       </div>
 
-      {/* Ваши жанры */}
-      <div className="bg-gray-900 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">Ваши жанры</h2>
-        <div className="space-y-3">
-           {TMDB_GENRES.map(genre => {
-             const count = tasteMap.genreCounts[genre] ?? 0;
-             const avg = tasteMap.genreProfile[genre] || 0;
-             const maxCount = Math.max(...Object.values(tasteMap.genreCounts), 1);
-             const barWidth = (count / maxCount) * 100;
-             const hasRating = avg > 0;
-             // Always show count for all genres
-             const countDisplay = `(${count})`;
-             const avgDisplay = hasRating ? avg.toFixed(1) : '—';
-             const translatedGenre = translateGenre(genre);
-             return (
-               <div key={genre} className="flex items-center text-sm">
-                 <div className="w-40 md:w-48 text-gray-300 truncate">{translatedGenre} {countDisplay} {avgDisplay}</div>
-                 <div className="flex-1 mx-2 bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                   <div className="bg-purple-500 h-full rounded-full" style={{ width: `${barWidth}%` }} />
+       {/* Ваши жанры */}
+       <div className="bg-gray-900 rounded-lg p-6">
+         <h2 className="text-xl font-semibold text-white mb-4">Ваши жанры</h2>
+         <div className="space-y-3">
+            {TMDB_GENRES.map(genre => {
+              const count = tasteMap.genreCounts[genre] ?? 0;
+              const avg = tasteMap.genreProfile[genre] || 0;
+              const total = tasteMap.totalWatched || 0;
+              const barWidth = total > 0 ? (count / total) * 100 : 0;
+              const hasRating = avg > 0;
+              const countDisplay = `(${count})`;
+              const avgDisplay = hasRating ? avg.toFixed(1) : '—';
+              const translatedGenre = translateGenre(genre);
+               return (
+                 <div key={genre} className="grid grid-cols-[140px_1fr_50px] md:grid-cols-[180px_1fr_50px] items-center gap-2 text-sm">
+                   <div className="text-gray-300 truncate">{translatedGenre} {countDisplay}</div>
+                   <div className="bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                     <div className="bg-purple-500 h-full rounded-full" style={{ width: `${barWidth}%` }} />
+                   </div>
+                   <div className="text-right text-gray-400 tabular-nums">{avgDisplay}</div>
                  </div>
-               </div>
-             );
-           })}
+               );
+             })}
+          </div>
         </div>
-      </div>
 
       {/* Twin Tasters / Similar Users */}
       <TwinTasters userId={userId} isAdmin={isAdmin} />

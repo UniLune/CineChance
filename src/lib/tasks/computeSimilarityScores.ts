@@ -99,7 +99,7 @@ export async function computeAllSimilarityScores(
         // Compute similarity for each candidate
         for (const userB of candidates) {
           try {
-            await computeAndStoreSimilarityScore(userA, userB, 'scheduler');
+            await computeAndStoreSimilarityScore(userA, userB, { computedBy: 'scheduler' });
             computed++;
           } catch (err) {
             errors++;
